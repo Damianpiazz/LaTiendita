@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "skills": {
+    "documentation": {
+      "source": "anthropics/knowledge-work-plugins",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/documentation/SKILL.md",
+      "computedHash": "43947d80ab634432362a076657eb225212760adbe731c0829a92709aeb842666"
+    },
+    "floci": {
+      "source": "floci-io/floci-cli",
+      "sourceType": "github",
+      "skillPath": "skills/floci/SKILL.md",
+      "computedHash": "3f511ded96cb856a2fe98265f187bd7714c52dce69940948854f55a2019b2f0d"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "106acf230014cbb43ca34e6410371321b56ca742f9ee0442e8ec05bf02eb0384"
+    },
+    "java-springboot": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/java-springboot/SKILL.md",
+      "computedHash": "108cb49f1d7950889b6223e5810266f1ff38bf62a0d52d932f6edc607a0ddfbf"
+    },
+    "multi-stage-dockerfile": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
+      "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
+    },
+    "open-pencil": {
+      "source": "open-pencil/open-pencil",
+      "sourceType": "github",
+      "skillPath": "skills/open-pencil/SKILL.md",
+      "computedHash": "7b816495b96758b35f0dd22e213d8925467089983845de2e57cd3f2a7f0d8d0f"
+    },
+    "springboot-security": {
+      "source": "affaan-m/ecc",
+      "sourceType": "github",
+      "skillPath": "skills/springboot-security/SKILL.md",
+      "computedHash": "c518a86c3a473e0545c35065d82284d13a5d99d6f7a0e17780594f3a44af38ad"
+    },
+    "terraform-style-guide": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/terraform/skills/terraform-style-guide/SKILL.md",
+      "computedHash": "b47790ecc50d56cba8970b8d9814e96d624cdd64a22a38118d11a554836cd768"
+    },
+    "terraform-test": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/terraform/skills/terraform-test/SKILL.md",
+      "computedHash": "c9e257250e14ea71e522e131a4a63a65434360fe3a0635c8bf8a49ca5529e2cd"
+    }
+  }
+}

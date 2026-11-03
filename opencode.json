@@ -1,0 +1,7 @@
+{
+  "mcp": {
+    "servers": {
+      "open-pencil": { "type": "local", "command": ["openpencil-mcp"] }
+    }
+  }
+}
