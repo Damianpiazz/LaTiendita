@@ -1,0 +1,18 @@
+services:
+  floci-az:
+    image: floci/floci-az:latest
+    ports:
+      - "4577:4577"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # required: Container Apps real mode
+      - ./data:/app/data # persists state + generated TLS cert
+    environment:
+      FLOCI_AZ_TLS_ENABLED: "true" # required: azurerm provider discovers the cloud over HTTPS
+      FLOCI_AZ_SERVICES_CONTAINER_APPS_MOCKED: "false" # real mode: replicas run as Docker containers
+      FLOCI_AZ_STORAGE_MODE: hybrid # in-memory + async flush every 5s
+    healthcheck:
+      # The image ships no curl/wget; healthcheck.sh is the official probe.
+      test: ["CMD", "healthcheck.sh"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
