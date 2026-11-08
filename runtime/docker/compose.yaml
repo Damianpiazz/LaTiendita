@@ -1,0 +1,38 @@
+# Uso: docker compose -f runtime/docker/compose.yaml up -d
+# Authorizer v2 recibe TODA la config por CLI flags (no lee .env ni env vars);
+# docker compose interpola el .env de este directorio hacia los flags.
+name: latiendita-docker
+
+services:
+  authorizer:
+    image: quay.io/authorizer/authorizer:2.4.4
+    ports:
+      # Loopback only: es el servidor de auth, no lo publiques a la red.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # SQLite persistido en el host; data/ ya está en .gitignore.
+      - ./authorizer/data:/authorizer/data
+    command:
+      # --url es obligatoria en v2: sin ella el server no arranca.
+      - --url=${AUTHORIZER_URL:?Copiá runtime/docker/.env.example a runtime/docker/.env}
+      # OAuth client obligatorio en v2.
+      - --client-id=${AUTHORIZER_CLIENT_ID:?Falta AUTHORIZER_CLIENT_ID en .env}
+      - --client-secret=${AUTHORIZER_CLIENT_SECRET:?Falta AUTHORIZER_CLIENT_SECRET en .env}
+      - --admin-secret=${AUTHORIZER_ADMIN_SECRET:?Falta AUTHORIZER_ADMIN_SECRET en .env}
+      # JWT HS256 para la prueba de levantamiento; migrar a RS256 si hace falta.
+      - --jwt-type=HS256
+      - --jwt-secret=${AUTHORIZER_JWT_SECRET:?Falta AUTHORIZER_JWT_SECRET en .env}
+      # Cifrado en reposo (TOTP/OTP). Distinto de JWT_SECRET para poder rotar
+      # uno sin invalidar al otro.
+      - --encryption-key=${AUTHORIZER_ENCRYPTION_KEY:?Falta AUTHORIZER_ENCRYPTION_KEY en .env}
+      # SQLite: cero contenedores extra para la prueba.
+      - --database-type=sqlite
+      - --database-url=/authorizer/data/data.db
+      # Customización LaTiendita.
+      - --organization-name=LaTiendita
+      - --roles=admin,cliente
+      - --default-roles=cliente
+      - --protected-roles=admin
+      # Aplicaciones con acceso (frontend Next.js + playground local).
+      - --allowed-origins=http://localhost:3000,http://localhost:8080
+    # La imagen ya define HEALTHCHECK contra /healthz (wget de busybox).
