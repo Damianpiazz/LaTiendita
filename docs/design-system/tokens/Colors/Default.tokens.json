@@ -1,0 +1,68 @@
+{
+  "$description": "LaTiendita wireframe color tokens. Collection: Colors, mode: Default. Grayscale only — no brand color until UI handoff.",
+  "background": {
+    "$type": "color",
+    "canvas": {
+      "$value": "#F5F5F6",
+      "$description": "Page background behind sections"
+    },
+    "surface": {
+      "$value": "#FFFFFF",
+      "$description": "Section and card surfaces, input fills"
+    },
+    "subtle": {
+      "$value": "#E4E4E7",
+      "$description": "Image placeholder fills and subtle bands"
+    },
+    "inverse": {
+      "$value": "#27272A",
+      "$description": "Primary button fill, cart badge"
+    },
+    "muted": {
+      "$value": "#D4D4D8",
+      "$description": "Logo and icon placeholder fills"
+    }
+  },
+  "border": {
+    "$type": "color",
+    "default": {
+      "$value": "#E4E4E7",
+      "$description": "Hairline separators on sections and cards"
+    },
+    "strong": {
+      "$value": "#A1A1AA",
+      "$description": "Inputs, buttons outline, dashed placeholder boxes"
+    }
+  },
+  "text": {
+    "$type": "color",
+    "primary": {
+      "$value": "#18181B",
+      "$description": "Headings, prices, card titles"
+    },
+    "secondary": {
+      "$value": "#3F3F46",
+      "$description": "Navigation and button outline labels"
+    },
+    "tertiary": {
+      "$value": "#52525B",
+      "$description": "Announcement bar and badge labels"
+    },
+    "muted": {
+      "$value": "#71717A",
+      "$description": "Secondary copy, footer links"
+    },
+    "placeholder": {
+      "$value": "#A1A1AA",
+      "$description": "Input placeholder text and chevron arrows"
+    },
+    "subtle": {
+      "$value": "#8A8A93",
+      "$description": "Image placeholder labels. Off-family gray: candidate to merge into text/muted (#71717A)"
+    },
+    "on-inverse": {
+      "$value": "#FFFFFF",
+      "$description": "Text on inverse (primary button) fills"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "$description": "LaTiendita wireframe typography tokens. Collection: Typography, mode: Default. Plain values only — composite typography tokens are refused by Figma/OpenPencil import.",
+  "family": {
+    "$type": "fontFamily",
+    "sans": {
+      "$value": "Inter",
+      "$description": "Only family in the system"
+    }
+  },
+  "weight": {
+    "$type": "fontWeight",
+    "regular": {
+      "$value": 400,
+      "$description": "Body copy, captions, links"
+    },
+    "medium": {
+      "$value": 500,
+      "$description": "Buttons, emphasized labels"
+    },
+    "bold": {
+      "$value": 700,
+      "$description": "Headings, prices, card titles"
+    }
+  },
+  "size": {
+    "$type": "dimension",
+    "12": {
+      "$value": { "value": 12, "unit": "px" },
+      "$description": "Caption, metadata, counters (migrates 10px and 13px)"
+    },
+    "14": {
+      "$value": { "value": 14, "unit": "px" },
+      "$description": "Body small: nav, footer links, labels (migrates 13px)"
+    },
+    "16": {
+      "$value": { "value": 16, "unit": "px" },
+      "$description": "Body: paragraphs, buttons, card titles (migrates 15px and 17px prices stay at 18px)"
+    },
+    "18": {
+      "$value": { "value": 18, "unit": "px" },
+      "$description": "Logo wordmark, prices (migrates 17px)"
+    },
+    "24": {
+      "$value": { "value": 24, "unit": "px" },
+      "$description": "Section headings (migrates 22px)"
+    },
+    "48": {
+      "$value": { "value": 48, "unit": "px" },
+      "$description": "Hero display (H1)"
+    }
+  },
+  "line-height": {
+    "$type": "number",
+    "tight": {
+      "$value": 1.2,
+      "$description": "Unitless line height, measured across all text nodes in the document"
+    }
+  }
+}

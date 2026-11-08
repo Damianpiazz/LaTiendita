@@ -1,0 +1,44 @@
+{
+  "$description": "LaTiendita wireframe spacing tokens. Collection: Spacing, mode: Default. 4px token granularity; layout blocks stay on the 8px grid.",
+  "$type": "dimension",
+  "4": {
+    "$value": { "value": 4, "unit": "px" },
+    "$description": "Tightest gaps (icon stacks, badge internals)"
+  },
+  "8": {
+    "$value": { "value": 8, "unit": "px" },
+    "$description": "Default inner gap (card content stacks)"
+  },
+  "12": {
+    "$value": { "value": 12, "unit": "px" },
+    "$description": "Gap between sibling groups"
+  },
+  "16": {
+    "$value": { "value": 16, "unit": "px" },
+    "$description": "Default card padding and control padding"
+  },
+  "20": {
+    "$value": { "value": 20, "unit": "px" },
+    "$description": "Comfortable inner padding"
+  },
+  "24": {
+    "$value": { "value": 24, "unit": "px" },
+    "$description": "Grid gutter between cards"
+  },
+  "32": {
+    "$value": { "value": 32, "unit": "px" },
+    "$description": "Block-level gaps, wide control padding"
+  },
+  "40": {
+    "$value": { "value": 40, "unit": "px" },
+    "$description": "Section inner padding (vertical)"
+  },
+  "48": {
+    "$value": { "value": 48, "unit": "px" },
+    "$description": "Page gutter and section padding"
+  },
+  "64": {
+    "$value": { "value": 64, "unit": "px" },
+    "$description": "Large section separation"
+  }
+}

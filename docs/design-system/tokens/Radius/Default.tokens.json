@@ -1,0 +1,16 @@
+{
+  "$description": "LaTiendita wireframe radius tokens. Collection: Radius, mode: Default.",
+  "$type": "dimension",
+  "8": {
+    "$value": { "value": 8, "unit": "px" },
+    "$description": "Controls: buttons, inputs, logo mark (migrates 6px)"
+  },
+  "12": {
+    "$value": { "value": 12, "unit": "px" },
+    "$description": "Surfaces: product/category cards, feature boxes (migrates 10px)"
+  },
+  "full": {
+    "$value": { "value": 999, "unit": "px" },
+    "$description": "Pills and circles: badges, counters"
+  }
+}
