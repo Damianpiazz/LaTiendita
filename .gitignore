@@ -5,7 +5,10 @@
 
 # floci-az runtime state (includes a private key — never commit)
 data/
-scripts/floci-az.crt
+floci-az.crt
+
+# Authorizer signing keys (never commit)
+runtime/*/authorizer/keys/
 
 # Terraform
 .terraform/
