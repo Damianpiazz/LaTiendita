@@ -1,8 +1,16 @@
+# Target: floci-az — emulador local de Azure.
+# Uso: docker compose -f runtime/floci-az/compose.yaml up -d
+# El emulador es independiente del stack de apps: Terraform es quien crea los
+# recursos dentro de él (ver runtime/floci-az/terraform/).
+name: latiendita-floci-az
+
 services:
   floci-az:
     image: floci/floci-az:latest
     ports:
-      - "4577:4577"
+      # Loopback only: el emulador acepta credenciales falsas, no lo publiques
+      # a la red. Los contenedores de la misma red lo alcanzan por nombre.
+      - "127.0.0.1:4577:4577"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # required: Container Apps real mode
       - ./data:/app/data # persists state + generated TLS cert
@@ -10,6 +18,7 @@ services:
       FLOCI_AZ_TLS_ENABLED: "true" # required: azurerm provider discovers the cloud over HTTPS
       FLOCI_AZ_SERVICES_CONTAINER_APPS_MOCKED: "false" # real mode: replicas run as Docker containers
       FLOCI_AZ_STORAGE_MODE: hybrid # in-memory + async flush every 5s
+      FLOCI_AZ_DOCKER_RESOURCE_NAMESPACE: latiendita # scopes child containers to this project
     healthcheck:
       # The image ships no curl/wget; healthcheck.sh is the official probe.
       test: ["CMD", "healthcheck.sh"]
