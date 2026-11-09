@@ -8,7 +8,7 @@ public record PaymentCreatedEvent(
         Long paymentId,
         Long orderId,
         String orderNumber,
-        Long customerId,
+        String customerId,
         BigDecimal amount,
         String currency,
         Instant occurredAt) {}

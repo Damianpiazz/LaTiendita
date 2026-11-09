@@ -67,7 +67,7 @@ public class PaymentService {
     private String statementDescriptor;
 
     public PaymentResponse create(CreatePaymentRequest request) {
-        Long customerId = CurrentUser.id();
+        String customerId = CurrentUser.id();
         OrderDto order = findOwnedOrder(request.orderId(), customerId);
         validateOrderIsPayable(order);
 
@@ -255,7 +255,7 @@ public class PaymentService {
         }
     }
 
-    private OrderDto findOwnedOrder(Long orderId, Long customerId) {
+    private OrderDto findOwnedOrder(Long orderId, String customerId) {
         OrderDto order = orderClient.findById(orderId);
         if (order.customerId() != null && !order.customerId().equals(customerId)) {
             throw new OrderNotFoundException(orderId);

@@ -8,7 +8,7 @@ import java.util.List;
 public record OrderResponse(
         Long id,
         String orderNumber,
-        Long customerId,
+        String customerId,
         OrderStatus status,
         BigDecimal total,
         boolean refundRequired,

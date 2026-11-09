@@ -11,7 +11,11 @@ public final class CurrentUser {
 
     private CurrentUser() {}
 
-    public static Long id() {
+    /**
+     * `sub` del token de Authorizer (UUID string, no numérico). Cualquier valor
+     * no vacío es válido: la validación de firma e issuer ya la hizo el gateway.
+     */
+    public static String id() {
         RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
         if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
             throw new MissingGatewayHeaderException();
@@ -20,10 +24,6 @@ public final class CurrentUser {
         if (value == null || value.isBlank()) {
             throw new MissingGatewayHeaderException();
         }
-        try {
-            return Long.valueOf(value.trim());
-        } catch (NumberFormatException ex) {
-            throw new MissingGatewayHeaderException();
-        }
+        return value.trim();
     }
 }

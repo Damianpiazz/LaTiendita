@@ -6,7 +6,7 @@ import java.time.Instant;
 public record OrderStatusChangedEvent(
         Long orderId,
         String orderNumber,
-        Long customerId,
+        String customerId,
         OrderStatus from,
         OrderStatus to,
         Instant occurredAt

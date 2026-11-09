@@ -46,8 +46,8 @@ public class OrderEntity {
     @Column(name = "order_number", nullable = false, unique = true, length = 36)
     private String orderNumber;
 
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @Column(name = "customer_id", nullable = false, length = 36)
+    private String customerId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

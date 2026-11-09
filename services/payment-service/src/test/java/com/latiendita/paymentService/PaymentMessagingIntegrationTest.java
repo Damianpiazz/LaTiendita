@@ -210,7 +210,7 @@ class PaymentMessagingIntegrationTest {
     }
 
     private OrderDto pendingOrder() {
-        return new OrderDto(7L, "ORD-7", 1L, "PENDING", new BigDecimal("2049.48"),
+        return new OrderDto(7L, "ORD-7", "1", "PENDING", new BigDecimal("2049.48"),
                 List.of(new OrderDto.Item(42L, "Notebook Lenovo", "NB-LEN-001", 2,
                         new BigDecimal("999.99"), new BigDecimal("1999.98"))));
     }

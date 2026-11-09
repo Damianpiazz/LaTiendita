@@ -6,7 +6,7 @@ import java.util.List;
 public record OrderDto(
         Long id,
         String orderNumber,
-        Long customerId,
+        String customerId,
         String status,
         BigDecimal total,
         List<Item> items) {

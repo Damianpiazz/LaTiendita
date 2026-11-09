@@ -57,7 +57,7 @@ public class OrderService {
     }
 
     private OrderResponse doCreate(CreateOrderRequest request) {
-        Long customerId = CurrentUser.id();
+        String customerId = CurrentUser.id();
         validateItems(request);
 
         OrderEntity order = OrderEntity.builder()

@@ -34,7 +34,7 @@ class OrderClientTest {
     private static final String URL = "http://order-service/api/orders/7";
 
     private static final String ORDER_JSON = """
-            {"id":7,"orderNumber":"ORD-7","customerId":1,"status":"PENDING","total":2049.48,
+            {"id":7,"orderNumber":"ORD-7","customerId":"1","status":"PENDING","total":2049.48,
              "items":[{"productId":42,"productTitle":"Notebook Lenovo","sku":"NB-LEN-001",
                        "quantity":2,"unitPrice":999.99,"subtotal":1999.98}]}
             """;

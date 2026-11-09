@@ -113,7 +113,7 @@ class OrderApiIntegrationTest {
 
     @Test
     void shouldReturn403WhenOrderBelongsToAnotherCustomer() throws Exception {
-        OrderEntity persisted = orderRepository.save(order(2L, OrderStatus.PENDING, "50.00"));
+        OrderEntity persisted = orderRepository.save(order("2", OrderStatus.PENDING, "50.00"));
 
         mockMvc.perform(get("/api/orders/{id}", persisted.getId()).header("X-User-Id", "1"))
                 .andExpect(status().isForbidden())
@@ -123,9 +123,9 @@ class OrderApiIntegrationTest {
     @Test
     void shouldListOnlyOrdersOfCurrentUserPaginated() throws Exception {
         orderRepository.saveAll(List.of(
-                order(1L, OrderStatus.PENDING, "10.00"),
-                order(1L, OrderStatus.PAID, "20.00"),
-                order(2L, OrderStatus.PENDING, "999.00")));
+                order("1", OrderStatus.PENDING, "10.00"),
+                order("1", OrderStatus.PAID, "20.00"),
+                order("2", OrderStatus.PENDING, "999.00")));
 
         mockMvc.perform(get("/api/orders").header("X-User-Id", "1")
                         .param("page", "0").param("size", "2"))
@@ -136,7 +136,7 @@ class OrderApiIntegrationTest {
 
     @Test
     void shouldCancelPendingOrder() throws Exception {
-        OrderEntity persisted = orderRepository.save(order(1L, OrderStatus.PENDING, "10.00"));
+        OrderEntity persisted = orderRepository.save(order("1", OrderStatus.PENDING, "10.00"));
 
         mockMvc.perform(post("/api/orders/{id}/cancel", persisted.getId())
                         .header("X-User-Id", "1")
@@ -150,7 +150,7 @@ class OrderApiIntegrationTest {
 
     @Test
     void shouldRejectInvalidTransitionWith409() throws Exception {
-        OrderEntity persisted = orderRepository.save(order(1L, OrderStatus.PENDING, "10.00"));
+        OrderEntity persisted = orderRepository.save(order("1", OrderStatus.PENDING, "10.00"));
 
         mockMvc.perform(post("/api/orders/{id}/status", persisted.getId())
                         .header("X-User-Id", "1")
@@ -180,7 +180,7 @@ class OrderApiIntegrationTest {
         assertThat(event.getPayload()).contains("\"productId\":42", "\"unitPrice\":999.99");
     }
 
-    private OrderEntity order(Long customerId, OrderStatus status, String total) {
+    private OrderEntity order(String customerId, OrderStatus status, String total) {
         OrderEntity order = OrderEntity.builder()
                 .orderNumber(UUID.randomUUID().toString())
                 .customerId(customerId)

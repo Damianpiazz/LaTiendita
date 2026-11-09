@@ -117,7 +117,7 @@ class OrderMessagingIntegrationTest {
 
     @Test
     void shouldRetryFailedEventsAndStopAfterMaxAttempts() {
-        OrderEntity retriable = orderRepository.save(order(1L));
+        OrderEntity retriable = orderRepository.save(order("1"));
         outboxWriter.append(OrderService.ORDER_EVENTS_TOPIC, retriable.getId(),
                 "ORDER_STATUS_CHANGED",
                 new OrderStatusChangedEvent(retriable.getId(), retriable.getOrderNumber(),
@@ -125,7 +125,7 @@ class OrderMessagingIntegrationTest {
                         Instant.now()));
         failEvent("broker caído");
 
-        OrderEntity exhausted = orderRepository.save(order(2L));
+        OrderEntity exhausted = orderRepository.save(order("2"));
         outboxWriter.append(OrderService.ORDER_EVENTS_TOPIC, exhausted.getId(),
                 "ORDER_STATUS_CHANGED",
                 new OrderStatusChangedEvent(exhausted.getId(), exhausted.getOrderNumber(),
@@ -216,7 +216,7 @@ class OrderMessagingIntegrationTest {
                 .orElseThrow();
     }
 
-    private OrderEntity order(Long customerId) {
+    private OrderEntity order(String customerId) {
         OrderEntity order = OrderEntity.builder()
                 .orderNumber(UUID.randomUUID().toString())
                 .customerId(customerId)

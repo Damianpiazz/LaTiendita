@@ -9,7 +9,7 @@ public record PaymentResponse(
         Long id,
         Long orderId,
         String orderNumber,
-        Long customerId,
+        String customerId,
         ProviderType provider,
         PaymentStatus status,
         BigDecimal amount,

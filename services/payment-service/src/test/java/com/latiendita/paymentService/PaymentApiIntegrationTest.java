@@ -144,7 +144,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldReturn403WhenPaymentBelongsToAnotherCustomer() throws Exception {
-        PaymentEntity persisted = paymentRepository.save(payment(2L, PaymentStatus.PENDING));
+        PaymentEntity persisted = paymentRepository.save(payment("2", PaymentStatus.PENDING));
 
         mockMvc.perform(get("/api/payments/{id}", persisted.getId()).header("X-User-Id", "1"))
                 .andExpect(status().isForbidden())
@@ -154,9 +154,9 @@ class PaymentApiIntegrationTest {
     @Test
     void shouldListOnlyPaymentsOfCurrentUserPaginated() throws Exception {
         paymentRepository.saveAll(List.of(
-                payment(1L, PaymentStatus.PENDING),
-                payment(1L, PaymentStatus.APPROVED),
-                payment(2L, PaymentStatus.PENDING)));
+                payment("1", PaymentStatus.PENDING),
+                payment("1", PaymentStatus.APPROVED),
+                payment("2", PaymentStatus.PENDING)));
 
         mockMvc.perform(get("/api/payments").header("X-User-Id", "1")
                         .param("page", "0").param("size", "2"))
@@ -167,7 +167,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldReturnPaymentByOrderIdForItsOwner() throws Exception {
-        PaymentEntity persisted = paymentRepository.save(payment(1L, PaymentStatus.PENDING));
+        PaymentEntity persisted = paymentRepository.save(payment("1", PaymentStatus.PENDING));
 
         mockMvc.perform(get("/api/payments/order/{orderId}", 7L).header("X-User-Id", "1"))
                 .andExpect(status().isOk())
@@ -231,7 +231,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldAcceptWebhookWithValidSignatureAndApprovePayment() throws Exception {
-        PaymentEntity payment = paymentRepository.save(payment(1L, PaymentStatus.PENDING));
+        PaymentEntity payment = paymentRepository.save(payment("1", PaymentStatus.PENDING));
 
         lenient().when(mercadopagoAdapter.getPayment("12345"))
                 .thenReturn(new PaymentGateway.GatewayPayment("12345", PaymentStatus.APPROVED,
@@ -259,7 +259,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldIgnoreWebhookWithInvalidSignatureAndKeepPaymentPending() throws Exception {
-        PaymentEntity payment = paymentRepository.save(payment(1L, PaymentStatus.PENDING));
+        PaymentEntity payment = paymentRepository.save(payment("1", PaymentStatus.PENDING));
 
         mockMvc.perform(post("/api/webhooks/mercado-pago")
                         .header("x-signature", "ts=1704908010,v1=deadbeef")
@@ -278,7 +278,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldAlwaysAcknowledgeWebhookEvenWhenGatewayFails() throws Exception {
-        PaymentEntity payment = paymentRepository.save(payment(1L, PaymentStatus.PENDING));
+        PaymentEntity payment = paymentRepository.save(payment("1", PaymentStatus.PENDING));
 
         lenient().when(mercadopagoAdapter.getPayment("12345"))
                 .thenThrow(new com.latiendita.paymentService.exception
@@ -298,7 +298,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldRecordEveryWebhookInTheInbox() throws Exception {
-        paymentRepository.save(payment(1L, PaymentStatus.PENDING));
+        paymentRepository.save(payment("1", PaymentStatus.PENDING));
 
         mockMvc.perform(post("/api/webhooks/mercado-pago")
                         .header("x-signature", signature("12345"))
@@ -313,7 +313,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldAcknowledgeDuplicatedWebhookOnlyOnce() throws Exception {
-        paymentRepository.save(payment(1L, PaymentStatus.PENDING));
+        paymentRepository.save(payment("1", PaymentStatus.PENDING));
 
         String body = "{\"action\":\"payment.updated\",\"type\":\"payment\","
                 + "\"id\":99,\"data\":{\"id\":\"12345\"}}";
@@ -354,14 +354,14 @@ class PaymentApiIntegrationTest {
     }
 
     private OrderDto orderWithStatus(String status) {
-        return new OrderDto(7L, "ORD-7", 1L, status, new BigDecimal("2049.48"),
+        return new OrderDto(7L, "ORD-7", "1", status, new BigDecimal("2049.48"),
                 List.of(new OrderDto.Item(42L, "Notebook Lenovo", "NB-LEN-001", 2,
                                 new BigDecimal("999.99"), new BigDecimal("1999.98")),
                         new OrderDto.Item(7L, "Mouse", "MS-001", 1,
                                 new BigDecimal("49.50"), new BigDecimal("49.50"))));
     }
 
-    private PaymentEntity payment(Long customerId, PaymentStatus status) {
+    private PaymentEntity payment(String customerId, PaymentStatus status) {
         return PaymentEntity.builder()
                 .orderId(7L)
                 .customerId(customerId)

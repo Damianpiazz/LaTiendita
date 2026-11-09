@@ -6,7 +6,7 @@ import java.time.Instant;
 public record RefundRequestedEvent(
         Long orderId,
         String orderNumber,
-        Long customerId,
+        String customerId,
         BigDecimal amount,
         Instant occurredAt
 ) {}

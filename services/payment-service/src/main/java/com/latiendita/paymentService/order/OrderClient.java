@@ -24,10 +24,10 @@ public class OrderClient {
     private final Retry retry;
 
     public OrderDto findById(Long orderId) {
-        Long customerId = CurrentUser.id();
+        String customerId = CurrentUser.id();
         Supplier<OrderDto> supplier = () -> restClient.get()
                 .uri("/api/orders/{orderId}", orderId)
-                .header(CurrentUser.HEADER, String.valueOf(customerId))
+                .header(CurrentUser.HEADER, customerId)
                 .retrieve()
                 .body(OrderDto.class);
         try {

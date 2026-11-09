@@ -6,6 +6,6 @@ public record PaymentRejectedEvent(
         String type,
         Long paymentId,
         Long orderId,
-        Long customerId,
+        String customerId,
         String statusDetail,
         Instant occurredAt) {}

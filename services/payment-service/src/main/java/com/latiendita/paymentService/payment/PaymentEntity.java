@@ -44,8 +44,8 @@ public class PaymentEntity {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @Column(name = "customer_id", nullable = false, length = 36)
+    private String customerId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

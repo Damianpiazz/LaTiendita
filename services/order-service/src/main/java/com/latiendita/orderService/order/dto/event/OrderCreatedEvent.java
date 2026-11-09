@@ -7,7 +7,7 @@ import java.util.List;
 public record OrderCreatedEvent(
         Long orderId,
         String orderNumber,
-        Long customerId,
+        String customerId,
         BigDecimal total,
         List<Item> items,
         Instant occurredAt

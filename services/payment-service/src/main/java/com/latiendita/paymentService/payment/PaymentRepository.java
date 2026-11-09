@@ -19,7 +19,7 @@ public interface PaymentRepository extends JpaRepository<PaymentEntity, Long> {
     Optional<PaymentEntity> findFirstByOrderIdAndStatusIn(
             Long orderId, Collection<PaymentStatus> statuses);
 
-    Page<PaymentEntity> findByCustomerId(Long customerId, Pageable pageable);
+    Page<PaymentEntity> findByCustomerId(String customerId, Pageable pageable);
 
     boolean existsByOrderIdAndStatus(Long orderId, PaymentStatus status);
 }

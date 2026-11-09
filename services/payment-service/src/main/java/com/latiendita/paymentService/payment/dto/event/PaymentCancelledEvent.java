@@ -6,5 +6,5 @@ public record PaymentCancelledEvent(
         String type,
         Long paymentId,
         Long orderId,
-        Long customerId,
+        String customerId,
         Instant occurredAt) {}

@@ -25,7 +25,7 @@ class PaymentApprovedConsumerTest {
 
     private static final String APPROVED = """
             {"type":"PAYMENT_APPROVED","paymentId":1,"orderId":7,"orderNumber":"ORD-7",\
-            "customerId":1,"amount":2049.48,"currency":"ARS","provider":"MERCADO_PAGO",\
+            "customerId":"1","amount":2049.48,"currency":"ARS","provider":"MERCADO_PAGO",\
             "providerPaymentId":"12345","occurredAt":"2026-10-12T12:00:00Z"}
             """;
 
@@ -98,7 +98,7 @@ class PaymentApprovedConsumerTest {
     private OrderEntity order(OrderStatus status) {
         OrderEntity order = OrderEntity.builder()
                 .orderNumber(UUID.randomUUID().toString())
-                .customerId(1L)
+                .customerId("1")
                 .status(status)
                 .total(new BigDecimal("2049.48"))
                 .createdAt(Instant.now())

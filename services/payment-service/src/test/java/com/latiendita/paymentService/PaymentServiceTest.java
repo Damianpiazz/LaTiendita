@@ -55,7 +55,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
 
-    private static final Long CUSTOMER = 1L;
+    private static final String CUSTOMER = "1";
 
     @Mock
     private PaymentRepository paymentRepository;
@@ -158,7 +158,7 @@ class PaymentServiceTest {
 
     @Test
     void shouldRejectPaymentForOrderOfAnotherCustomer() {
-        when(orderClient.findById(7L)).thenReturn(orderForCustomer(999L));
+        when(orderClient.findById(7L)).thenReturn(orderForCustomer("999"));
 
         assertThatThrownBy(() -> paymentService.create(new CreatePaymentRequest(7L, "ana@mail.com")))
                 .isInstanceOf(OrderNotFoundException.class);
@@ -283,7 +283,7 @@ class PaymentServiceTest {
     @Test
     void shouldDenyAccessToPaymentOfAnotherCustomer() {
         PaymentEntity payment = payment(PaymentStatus.PENDING);
-        payment.setCustomerId(999L);
+        payment.setCustomerId("999");
         when(paymentRepository.findById(5L)).thenReturn(Optional.of(payment));
 
         assertThatThrownBy(() -> paymentService.findById(5L))
@@ -304,7 +304,7 @@ class PaymentServiceTest {
     @Test
     void shouldDenyFindByOrderIdOfAnotherCustomer() {
         PaymentEntity payment = payment(PaymentStatus.PENDING);
-        payment.setCustomerId(999L);
+        payment.setCustomerId("999");
         when(paymentRepository.findByOrderId(7L)).thenReturn(Optional.of(payment));
 
         assertThatThrownBy(() -> paymentService.findByOrderId(7L))
@@ -325,11 +325,11 @@ class PaymentServiceTest {
         return orderForCustomer(CUSTOMER, status);
     }
 
-    private OrderDto orderForCustomer(Long customerId) {
+    private OrderDto orderForCustomer(String customerId) {
         return orderForCustomer(customerId, "PENDING");
     }
 
-    private OrderDto orderForCustomer(Long customerId, String status) {
+    private OrderDto orderForCustomer(String customerId, String status) {
         return new OrderDto(7L, "ORD-7", customerId, status, new BigDecimal("2049.48"),
                 List.of(new OrderDto.Item(42L, "Notebook Lenovo", "NB-LEN-001", 2,
                                 new BigDecimal("999.99"), new BigDecimal("1999.98")),

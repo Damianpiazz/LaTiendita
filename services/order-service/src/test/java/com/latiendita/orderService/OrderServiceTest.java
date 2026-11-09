@@ -53,7 +53,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
-    private static final Long CUSTOMER = 1L;
+    private static final String CUSTOMER = "1";
 
     @Mock
     private OrderRepository orderRepository;
@@ -72,7 +72,7 @@ class OrderServiceTest {
 
     @BeforeEach
     void setCurrentUser() {
-        setCurrentUserHeader(String.valueOf(CUSTOMER));
+        setCurrentUserHeader(CUSTOMER);
     }
 
     @AfterEach
@@ -170,7 +170,7 @@ class OrderServiceTest {
     @Test
     void shouldDenyAccessToOrderOfAnotherCustomer() {
         when(orderRepository.findWithItemsById(5L))
-                .thenReturn(Optional.of(order(999L, OrderStatus.PENDING, "10.00")));
+                .thenReturn(Optional.of(order("999", OrderStatus.PENDING, "10.00")));
 
         assertThatThrownBy(() -> orderService.findById(5L))
                 .isInstanceOf(OrderAccessDeniedException.class);
@@ -278,7 +278,7 @@ class OrderServiceTest {
                 sku, new BigDecimal(price), 10, 7L);
     }
 
-    private OrderEntity order(Long customerId, OrderStatus status, String total) {
+    private OrderEntity order(String customerId, OrderStatus status, String total) {
         OrderEntity order = OrderEntity.builder()
                 .orderNumber(UUID.randomUUID().toString())
                 .customerId(customerId)
