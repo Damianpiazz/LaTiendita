@@ -40,6 +40,7 @@ class GatewayRoutingIntegrationTest {
     private static HttpServer stub;
     private static int stubPort;
 
+    private static volatile String lastRequestPath;
     private static volatile String lastUserHeader;
     private static volatile String lastRolesHeader;
     private static volatile String lastCorrelationHeader;
@@ -49,6 +50,7 @@ class GatewayRoutingIntegrationTest {
         stub = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         stubPort = stub.getAddress().getPort();
         stub.createContext("/", exchange -> {
+            lastRequestPath = exchange.getRequestURI().getPath();
             lastUserHeader = exchange.getRequestHeaders().getFirst("X-User-Id");
             lastRolesHeader = exchange.getRequestHeaders().getFirst("X-User-Roles");
             lastCorrelationHeader = exchange.getRequestHeaders().getFirst("X-Correlation-Id");
@@ -72,8 +74,7 @@ class GatewayRoutingIntegrationTest {
     @DynamicPropertySource
     static void routes(DynamicPropertyRegistry registry) {
         String base = "http://127.0.0.1:" + stubPort;
-        registry.add("AUTH_SERVICE_BASE_URL", () -> base);
-        registry.add("USER_SERVICE_BASE_URL", () -> base);
+        registry.add("AUTHORIZER_BASE_URL", () -> base);
         registry.add("PRODUCT_SERVICE_BASE_URL", () -> base);
         registry.add("ORDER_SERVICE_BASE_URL", () -> base);
         registry.add("PAYMENT_SERVICE_BASE_URL", () -> base);
@@ -116,6 +117,8 @@ class GatewayRoutingIntegrationTest {
         ResponseEntity<String> response = rest.postForEntity("/api/auth/login",
                 new HttpEntity<>(new HttpHeaders()), String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // El gateway reescribe al endpoint REST de Authorizer (/v1/*).
+        assertThat(lastRequestPath).isEqualTo("/v1/login");
     }
 
     @Test
