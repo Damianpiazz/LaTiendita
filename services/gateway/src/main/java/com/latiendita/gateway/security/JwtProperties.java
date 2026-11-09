@@ -9,5 +9,9 @@ public record JwtProperties(String secret, String issuer) {
         if (secret == null || secret.length() < 32) {
             throw new IllegalArgumentException("jwt.secret debe tener al menos 32 caracteres (HS256)");
         }
+        if (issuer == null || issuer.isBlank()) {
+            throw new IllegalArgumentException(
+                    "jwt.issuer es obligatorio (debe coincidir con AUTHORIZER_URL de Authorizer)");
+        }
     }
 }
