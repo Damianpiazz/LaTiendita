@@ -14,17 +14,37 @@ public final class TestJwtFactory {
     }
 
     public static String token(long accountId) {
+        return token(accountId, new String[0]);
+    }
+
+    /**
+     * Token de prueba con roles, igual que los que emite Authorizer
+     * (claim "roles": ["admin", ...]).
+     */
+    public static String token(long accountId, String... roles) {
         try {
             String header = base64Url("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
             long now = System.currentTimeMillis() / 1000;
-            String claims = base64Url("{\"iss\":\"" + TEST_ISSUER + "\","
-                    + "\"sub\":\"" + accountId + "\","
-                    + "\"email\":\"ana@mail.com\","
-                    + "\"username\":\"ana\","
-                    + "\"iat\":" + now + ","
-                    + "\"exp\":" + (now + 900) + "}");
+            StringBuilder claims = new StringBuilder();
+            claims.append("{\"iss\":\"").append(TEST_ISSUER).append("\",")
+                    .append("\"sub\":\"").append(accountId).append("\",")
+                    .append("\"email\":\"ana@mail.com\",")
+                    .append("\"username\":\"ana\",");
+            if (roles.length > 0) {
+                claims.append("\"roles\":[");
+                for (int i = 0; i < roles.length; i++) {
+                    if (i > 0) {
+                        claims.append(',');
+                    }
+                    claims.append('"').append(roles[i]).append('"');
+                }
+                claims.append("],");
+            }
+            claims.append("\"iat\":").append(now)
+                    .append(",\"exp\":").append(now + 900)
+                    .append('}');
 
-            String signingInput = header + "." + claims;
+            String signingInput = header + "." + base64Url(claims.toString());
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(TEST_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             String signature = base64Url(mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8)));

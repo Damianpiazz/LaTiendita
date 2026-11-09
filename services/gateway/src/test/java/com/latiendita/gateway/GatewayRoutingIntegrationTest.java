@@ -41,6 +41,7 @@ class GatewayRoutingIntegrationTest {
     private static int stubPort;
 
     private static volatile String lastUserHeader;
+    private static volatile String lastRolesHeader;
     private static volatile String lastCorrelationHeader;
 
     @BeforeAll
@@ -49,6 +50,7 @@ class GatewayRoutingIntegrationTest {
         stubPort = stub.getAddress().getPort();
         stub.createContext("/", exchange -> {
             lastUserHeader = exchange.getRequestHeaders().getFirst("X-User-Id");
+            lastRolesHeader = exchange.getRequestHeaders().getFirst("X-User-Roles");
             lastCorrelationHeader = exchange.getRequestHeaders().getFirst("X-Correlation-Id");
             byte[] body = "{\"stub\":true}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -128,6 +130,55 @@ class GatewayRoutingIntegrationTest {
         ResponseEntity<String> response = rest.postForEntity("/api/products",
                 new HttpEntity<>(new HttpHeaders()), String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void rechazaConTokenSinRolAdminLaEscrituraDelCatalogo() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.postForEntity("/api/products",
+                new HttpEntity<>(authHeaders(token)), String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteLaEscrituraDelCatalogoConRolAdmin() {
+        String token = TestJwtFactory.token(42, "admin");
+        ResponseEntity<String> response = rest.postForEntity("/api/products",
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"stub\":true");
+    }
+
+    @Test
+    void propagaLosRolesDelTokenComoXRolsHeader() {
+        String token = TestJwtFactory.token(42, "admin", "cliente");
+        rest.exchange("/api/orders", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(lastRolesHeader).isEqualTo("admin,cliente");
+    }
+
+    @Test
+    void sanitizaElXRolsSpoofeado() {
+        String token = TestJwtFactory.token(42, "cliente");
+        HttpHeaders headers = authHeaders(token);
+        headers.set("X-User-Roles", "admin");
+
+        rest.exchange("/api/orders", HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(lastRolesHeader).isEqualTo("cliente");
+    }
+
+    @Test
+    void sinRolesEnElTokenNoPropagaElHeader() {
+        String token = TestJwtFactory.token(42);
+        HttpHeaders headers = authHeaders(token);
+        headers.set("X-User-Roles", "admin");
+
+        rest.exchange("/api/orders", HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(lastRolesHeader).isNull();
     }
 
     @Test
