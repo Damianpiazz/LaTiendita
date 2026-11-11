@@ -97,6 +97,8 @@ Granularidad de 4px para tokens; los bloques de layout respetan la grilla de 8px
 | 48 | Margen de página |
 | 1344 | Ancho de contenido (1440 − 96) |
 | 72 | Altura de header |
+| 240 | Ancho de sidebar del panel admin |
+| 1136 | Ancho de contenido admin (1200 − 64) |
 
 ---
 
@@ -114,6 +116,25 @@ Inventario medido en el documento (clusters con ≥ 2 repeticiones):
 | `Hero image` | 560 × 340, radio 12, borde dashed | `background/subtle`, `text/subtle` |
 | `Newsletter box` | 1344 × 132, radio 12, borde dashed | `background/surface`, `border/strong` |
 | `Logo` | ícono 28 × 28 radio 8 + wordmark 18/700 | `background/muted`, `title` |
+| `Card/Category (grid)` | 318 × 232 (imagen 318 × 160, cuerpo padding 16) | `border/default`, `radius/12`, `background/subtle` |
+| `Filter pill` | alto 40, radio full, padding X 16 | activa: `background/inverse` + `text/on-inverse` · inactiva: `border/strong` + `text/secondary` |
+| `Step indicator` | círculo 24 × 24 + label 14, gap 8 | `background/inverse` / `background/subtle`, `radius/full` |
+| `Method card` | ancho 944, padding 20, radio 12 (seleccionada: borde 2) | `background/surface`, `border/default` / `border/strong` |
+| `Store option` | 904 × 89, padding 16, radio 12 | `background/surface`, `border/default`, `radius/12` |
+| `Order summary` | ancho 376, padding 20, radio 12 | `background/surface`, `border/default`, `radius/12` |
+| `Radio / Checkbox` | 24 × 24 | `background/inverse` / `border/strong`, `radius/full` / `8` |
+| `Admin shell` | sidebar 240 + main 1200, topbar 72 | `background/surface`, `border/default`, gutter 32 |
+| `Nav item` | 208 × 40, padding X 12, radio 8 | activo: `background/inverse` + `text/on-inverse` · inactivo: `text/secondary` |
+| `KPI card` | 266 × 117, padding 20, radio 12 | `background/surface`, `border/default`, valor `24/700` |
+| `Stat strip` | 1136 × 81, padding 20/24, 4 stats de 235, radio 12 | `background/surface`, `border/default`, divisores verticales de 1 px |
+| `Data table` | fila 56, padding X 20, header 40 | `border/default` hairline, header `background/canvas` |
+| `Status badge` | alto 24, padding X 8, radio full | pagado/aprobado: `background/inverse` · enviado: `background/subtle` · pendiente: borde sólido · cancelado/rechazado: borde dashed |
+| `List row` | alto 56–60, padding X 20 | `border/default` hairline, `body-sm` + `caption` |
+| `Bulk action bar` | alto 56, padding X 20, radio 12 | `background/canvas`, `border/strong`, acciones de 32 de alto |
+| `Category list row` | 700 × 72 (ícono 40), padding X 20 | seleccionada: `background/canvas`; `border/default` hairline |
+| `Detail panel` | 412 de ancho, padding 20, radio 12 | `background/surface`, `border/default`, acción primaria + outline |
+| `Status tabs` | alto 40, radio full, padding X 16, contador 12/700 | activa: `background/inverse` + `text/on-inverse` · inactiva: `border/strong` + contador `text/muted` |
+| `Chart placeholder` | barras 48 de ancho, alto variable, radio 8 | `background/subtle`, barra del día actual en `background/inverse` |
 
 ---
 
