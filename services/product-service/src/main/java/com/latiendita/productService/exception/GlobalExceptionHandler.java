@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Recurso duplicado", ex.getMessage());
     }
 
+    @ExceptionHandler(DuplicateSlugException.class)
+    public ProblemDetail onDuplicateSlug(DuplicateSlugException ex) {
+        return problem(HttpStatus.CONFLICT, "Recurso duplicado", ex.getMessage());
+    }
+
     @ExceptionHandler(DuplicateCategoryException.class)
     public ProblemDetail onDuplicateCategory(DuplicateCategoryException ex) {
         return problem(HttpStatus.CONFLICT, "Recurso duplicado", ex.getMessage());

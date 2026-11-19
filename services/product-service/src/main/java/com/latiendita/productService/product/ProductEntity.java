@@ -1,6 +1,10 @@
 package com.latiendita.productService.product;
 
+import com.latiendita.productService.product.dto.JsonListConverter;
+import com.latiendita.productService.product.dto.JsonSpecsConverter;
+import com.latiendita.productService.product.dto.ProductSpec;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,6 +18,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,7 +28,8 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "products", uniqueConstraints = {
-        @UniqueConstraint(columnNames = "sku")
+        @UniqueConstraint(columnNames = "sku"),
+        @UniqueConstraint(columnNames = "slug")
 })
 @Getter
 @Setter
@@ -59,6 +66,44 @@ public class ProductEntity {
 
     @Column(name = "category_id")
     private Long categoryId;
+
+    @Column(name = "slug", unique = true, length = 255)
+    private String slug;
+
+    @Column(length = 100)
+    private String subcategory;
+
+    @Builder.Default
+    @Column(name = "featured")
+    private Boolean featured = false;
+
+    @PositiveOrZero
+    @Digits(integer = 10, fraction = 2)
+    @Column(name = "original_price", precision = 12, scale = 2)
+    private BigDecimal originalPrice;
+
+    @Column(length = 100)
+    private String fulfillment;
+
+    @Builder.Default
+    @Convert(converter = JsonListConverter.class)
+    @Column(name = "images_json", columnDefinition = "text")
+    private List<String> images = new ArrayList<>();
+
+    @Builder.Default
+    @Convert(converter = JsonListConverter.class)
+    @Column(name = "description_json", columnDefinition = "text")
+    private List<String> description = new ArrayList<>();
+
+    @Builder.Default
+    @Convert(converter = JsonListConverter.class)
+    @Column(name = "highlights_json", columnDefinition = "text")
+    private List<String> highlights = new ArrayList<>();
+
+    @Builder.Default
+    @Convert(converter = JsonSpecsConverter.class)
+    @Column(name = "specs_json", columnDefinition = "text")
+    private List<ProductSpec> specs = new ArrayList<>();
 
     @Version
     @Column(name = "version", nullable = false)

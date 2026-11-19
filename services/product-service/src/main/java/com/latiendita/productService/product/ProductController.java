@@ -47,7 +47,7 @@ public class ProductController {
     }
 
     /**
-     * GET /api/products?q=&categoryId=&page=&size=&sort=
+     * GET /api/products?q=&categoryId=&featured=&page=&size=&sort=
      *
      * Los filtros son opcionales y combinables: sin parámetros se comporta igual
      * que antes. `sort` sólo acepta `propiedad` o `propiedad,asc|desc` sobre
@@ -57,13 +57,15 @@ public class ProductController {
     public Page<ProductDto> findAll(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Boolean featured,
             Pageable pageable) {
-        return productService.search(q, categoryId, pageable);
+        return productService.search(q, categoryId, featured, pageable);
     }
 
-    @GetMapping("/{productId}")
-    public ProductDto findById(@PathVariable Long productId) {
-        return productService.findById(productId);
+    /** Acepta tanto el ID numérico histórico como el slug del catálogo. */
+    @GetMapping("/{productIdOrSlug}")
+    public ProductDto findByIdOrSlug(@PathVariable String productIdOrSlug) {
+        return productService.findByIdOrSlug(productIdOrSlug);
     }
 
     @DeleteMapping("/{productId}")

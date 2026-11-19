@@ -16,10 +16,10 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://productServic
 | Método | Ruta | Descripción | Request | Response | Auth |
 |---|---|---|---|---|---|
 | `GET` | `/actuator/health` | Health check para probes de Kubernetes (`readiness` incluye `db`) | — | `200` `{ status }` | No |
-| `GET` | `/api/products` | Listado paginado de productos con filtros opcionales `q` (búsqueda por título), `categoryId` y `sort` | — | `200` Page\<ProductDto\> | No |
-| `GET` | `/api/products/{productId}` | Obtiene un producto por su ID | — | `200` ProductDto | No |
+| `GET` | `/api/products` | Listado paginado de productos con filtros opcionales `q` (búsqueda por título), `categoryId`, `featured` y `sort` | — | `200` Page\<ProductDto\> | No |
+| `GET` | `/api/products/{productIdOrSlug}` | Obtiene un producto por su ID numérico histórico o por su `slug` (para las rutas amigables del catálogo) | — | `200` ProductDto | No |
 | `GET` | `/api/products/{productId}/image` | Sirve la imagen del producto: si `image_url` es `http(s)://` redirige (`302`); si es clave de blob, proxya los bytes con `Cache-Control: public, max-age=3600` | — | `200` binario / `302` / `404` | No |
-| `POST` | `/api/products` | Crea un producto (valida SKU duplicado y existencia de la categoría) | `ProductDto` | `201` ProductDto + `Location` | Sí (admin, vía gateway) |
+| `POST` | `/api/products` | Crea un producto (valida SKU y slug duplicados y existencia de la categoría; genera el `slug` desde `title` si no se envía) | `ProductDto` | `201` ProductDto + `Location` | Sí (admin, vía gateway) |
 | `PUT` | `/api/products` | Actualiza un producto (el ID viene en el body) | `ProductDto` | `200` ProductDto | Sí (admin, vía gateway) |
 | `PUT` | `/api/products/{productId}` | Actualiza un producto (el ID de la ruta tiene prioridad) | `ProductDto` | `200` ProductDto | Sí (admin, vía gateway) |
 | `DELETE` | `/api/products/{productId}` | Elimina un producto (borrado físico) | — | `204` | Sí (admin, vía gateway) |
@@ -32,16 +32,15 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://productServic
 | `PUT` | `/api/categories/{categoryId}` | Actualiza una categoría (el ID de la ruta tiene prioridad) | `CategoryDto` | `200` CategoryDto | Sí (admin, vía gateway) |
 | `DELETE` | `/api/categories/{categoryId}` | Elimina una categoría (borrado físico) | — | `204` | Sí (admin, vía gateway) |
 
-**Comportamiento de `sort`:** formato `propiedad` o `propiedad,asc|desc`. Propiedades permitidas en productos: `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`; en categorías: `id`, `name`, `description`. Cualquier otra (incluidos `-id` o `campo:1`) responde `400` vía `SortValidator` **antes** de llegar a JPA.
+**Comportamiento de `sort`:** formato `propiedad` o `propiedad,asc|desc`. Propiedades permitidas en productos: `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`, `slug`, `subcategory`, `featured`, `originalPrice`, `fulfillment`; en categorías: `id`, `name`, `description`. Cualquier otra (incluidos `-id` o `campo:1`) responde `400` vía `SortValidator` **antes** de llegar a JPA.
 
-**Filtros combinables de `GET /api/products`:** `q` + `categoryId`, sólo `q`, sólo `categoryId`, o ninguno (queries derivadas separadas, sin inferencia de tipos ante `null`).
+**Filtros combinables de `GET /api/products`:** `q` + `categoryId` + `featured`, y cualquier subconjunto (incluido ninguno). Se resuelven con una única query JPQL con parámetros anulables, sin inferencia de tipos ante `null`.
 
 ### 2.1 Endpoints pendientes
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
-| `POST` | `/api/products/{productId}/images` | Subida de imágenes desde el ABM de administración (hoy sólo existen el seed y el proxy `GET`) | `<a implementar>` |
-| `GET` | `/api/products?featured=true` (o `/api/products/featured`) | Productos destacados para la sección "Featured" del Home (no existe flag `featured` en la entidad) | `<a implementar>` |
+| `POST` | `/api/products/{productId}/images` | Subida de imágenes desde el ABM de administración (hoy la galería se envía como JSON en `POST`/`PUT /api/products`) | `<a implementar>` |
 | `GET` | `/api/admin/products?quantityBelow=5` | Productos con stock bajo (KPI "Stock bajo" del Admin Resumen) | `<a implementar>` |
 
 ---
@@ -67,6 +66,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `404` | Not Found | Recurso inexistente (`Producto no encontrado` / `Categoría no encontrada`) | `Producto no encontrado con id 42` |
 | `404` | Not Found | `GET /api/products/{id}/image` sin `image_url` o blob inexistente | *(body vacío)* |
 | `409` | Conflict | SKU duplicado (`Recurso duplicado`) | `El SKU 'SKU-001' ya está en uso` |
+| `409` | Conflict | Slug duplicado (`Recurso duplicado`) | `El slug 'auriculares-inalambricos' ya está en uso` |
 | `409` | Conflict | Categoría duplicada (`Recurso duplicado`) | `La categoría 'Tecnología' ya existe` |
 | `409` | Conflict | Conflicto de concurrencia por `@Version` (optimistic locking) | `El recurso fue modificado por otra operación; reintente la petición` |
 | `409` | Conflict | Violación de restricción única (`DataIntegrityViolationException`) | `Violación de restricción única (posible carrera entre peticiones simultáneas)` |
@@ -91,6 +91,15 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `price` | `numeric(12,2)` | ❌ | ❌ | ❌ | Precio unitario, `>= 0`, hasta 2 decimales |
 | `quantity` | `integer` | ❌ | ❌ | ❌ | Stock disponible, `>= 0` |
 | `category_id` | `bigint` | ❌ | ❌ | ❌ | Referencia a `categories.id` (sin FK en JPA; se valida existencia en servicio) |
+| `slug` | `varchar(255)` | ❌ | ❌ | ✅ | Identificador amigable para rutas del catálogo; se genera desde `title` (normalizando acentos) si no se envía |
+| `subcategory` | `varchar(100)` | ❌ | ❌ | ❌ | Agrupación dentro de la categoría (ej. `Audio` bajo `Tecnología`) |
+| `featured` | `boolean` | ❌ | ❌ | ❌ | Marca el producto para la grilla "Featured" del Home (default `false`) |
+| `original_price` | `numeric(12,2)` | ❌ | ❌ | ❌ | Precio anterior tachado en la tarjeta/detalle, `>= 0`, hasta 2 decimales |
+| `fulfillment` | `varchar(100)` | ❌ | ❌ | ❌ | Texto de disponibilidad/envío (ej. `24/48 hs`) |
+| `images_json` | `text` | ❌ | ❌ | ❌ | Galería de imágenes como array JSON de strings (`JsonListConverter`); `image_url` sigue siendo la imagen principal/proxy |
+| `description_json` | `text` | ❌ | ❌ | ❌ | Párrafos de descripción como array JSON (`JsonListConverter`) |
+| `highlights_json` | `text` | ❌ | ❌ | ❌ | Puntos destacados como array JSON (`JsonListConverter`) |
+| `specs_json` | `text` | ❌ | ❌ | ❌ | Especificaciones como array JSON de `{label,value}` (`JsonSpecsConverter` y `ProductSpec`) |
 | `version` | `bigint` | ❌ | ❌ | ❌ | Optimistic locking (`@Version`) |
 
 #### `CategoryEntity` → tabla `categories`
@@ -112,7 +121,8 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 
 | Regla | Detalle |
 |---|---|
-| Unicidad | `products.sku` y `categories.name` no pueden repetirse (chequeo previo `existsBySku` / `existsByName` + constraint de BD) |
+| Unicidad | `products.sku`, `products.slug` y `categories.name` no pueden repetirse (chequeo previo `existsBySku` / `existsBySlug` / `existsByName` + constraint de BD) |
+| Slug | Se normaliza (`NFKD`, sin diacríticos, minúsculas, guiones) desde el `slug` provisto o, si falta, desde `title` (o `sku` como último recurso). En `update` se conserva el existente si no se envía uno nuevo |
 | Referencia de categoría | Un producto con `categoryId != null` sólo se crea/actualiza si la categoría existe; si es `null` está permitido (producto sin categoría) |
 | Borrado | Físico (`delete`) en ambos modelos; no hay borrado lógico ni protección de referencias hacia productos al borrar una categoría |
 | Concurrencia | Ambas entidades usan `@Version`: actualizaciones concurrentes devuelven `409` |
@@ -126,8 +136,10 @@ Campos derivados de las entidades de §4.1 y de lo que consumen las pantallas de
 
 | DTO | Uso | Campos | Origen / nota |
 |---|---|---|---|
-| `ProductDto` | `GET /api/products`, `GET /api/products/{id}`, body de `POST`/`PUT /api/products` | `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId` | Proyección directa de `ProductEntity`. No incluye `description` ni galería de imágenes: no existen en el modelo (§7) |
+| `ProductDto` | `GET /api/products`, `GET /api/products/{productIdOrSlug}`, body de `POST`/`PUT /api/products` | Históricos: `productId`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`. Alias derivados: `id` (= `productId` como string), `name` (= `title`), `stock` (= `quantity`), `galleryCount`. Catálogo/detalle: `slug`, `categoryName`, `subcategory`, `featured`, `originalPrice`, `fulfillment`, `images`, `description`, `highlights`, `specs` (`[{label,value}]`) | La entidad conserva los campos históricos; el mapper agrega los alias y el `categoryName` (resuelto con `findAllById` para evitar N+1). Si `images` viene vacío, usa `imageUrl` como única imagen. **No incluye** `installmentCount`, `rating`, `reviewCount` ni `soldCount`: cuotas y valoraciones quedan fuera de este servicio |
 | `CategoryDto` | `GET /api/categories[/{id}]`, body de `POST`/`PUT /api/categories` | `id`, `name`, `description` | Proyección directa de `CategoryEntity` |
+
+> Nota de compatibilidad: el constructor de 7 argumentos de `ProductDto` (`productId, title, imageUrl, sku, price, quantity, categoryId`) se conserva para los clientes internos que aún lo usan; los campos nuevos defaultan a vacío/`false` en ese constructor. Clientes como `order-service` y `cart-service` deserializan los campos históricos sin cambios.
 
 ---
 
@@ -205,16 +217,16 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | Pantalla | Soporte en este servicio | Estado |
 |---|---|---|
 | **Home — sección "Categories"** (grilla de categorías) | `GET /api/categories` (paginado) alimenta las cards de categorías | ✅ Implementado |
-| **Home — sección "Featured"** (grilla de productos destacados con imagen, nombre, precio y valoración) | Imagen → `GET /api/products/{id}/image`; nombre/precio → `GET /api/products`. **Destacado** (flag `featured`) y **valoración** no existen acá: la valoración la aporta `review-service` | ⚠️ Destacado: `<a implementar>`; valoración: fuera de este servicio |
+| **Home — sección "Featured"** (grilla de productos destacados con imagen, nombre, precio y valoración) | `GET /api/products?featured=true` filtra por el flag `featured`; imagen → `GET /api/products/{id}/image`, nombre/precio → aliases `name`/`price` del `ProductDto`. **Valoración** no existe acá: la aporta `review-service` | ✅ Destacado implementado; valoración: fuera de este servicio |
 | **Categories (listado)** — título, toolbar de búsqueda/filtros, grilla de cards | `GET /api/categories` (+ `sort` validado); búsqueda/filtros de categorías más allá del paginado: `<a implementar>` | ⚠️ Parcial |
 | **Category "Tecnología" (listado de productos)** — breadcrumb, toolbar de filtros y orden, grilla, paginación | `GET /api/products?categoryId={id}&q={texto}&page=&size=&sort=` (filtros combinables, paginación `Page`, sort con allowlist). El breadcrumb resuelve el nombre con `GET /api/categories/{id}` | ✅ Implementado |
-| **Product Detail — galería** (imagen principal + thumbnails) | Imagen principal → `GET /api/products/{id}/image` (un `image_url` por producto). **Galería múltiple / thumbnails**: no hay entidad de imágenes ni endpoint de subida (sólo el seed) | ⚠️ `<a implementar>` (galería y subida) |
-| **Product Detail — bloque de info** (nombre, precio, stock/disponibilidad, botón "Agregar al carrito") | `GET /api/products/{id}` → `title`, `price`, `quantity` (disponibilidad = `quantity > 0`). La creación del carrito es responsabilidad del frontend | ✅ Implementado |
-| **Product Detail — pestañas de detalles/especificaciones** | `GET /api/products/{id}` sólo expone `title`, `sku`, `price`, `quantity`, `categoryId`, `imageUrl`. **`description` y especificaciones no existen en `ProductEntity`** | ⚠️ `<a implementar>` (campo `description`/specs) |
+| **Product Detail — galería** (imagen principal + thumbnails) | `GET /api/products/{productIdOrSlug}` → `images` (array JSON de URLs/claves) + `imageUrl` como imagen principal; el proxy `GET /api/products/{id}/image` sigue resolviendo claves a bytes. La subida desde el ABM sigue pendiente | ✅ Galería múltiple implementada (JSON); subida: `<a implementar>` |
+| **Product Detail — bloque de info** (nombre, precio, stock/disponibilidad, botón "Agregar al carrito") | `GET /api/products/{productIdOrSlug}` → `name`/`title`, `price`, `stock`/`quantity`, `originalPrice` (precio tachado), `fulfillment` (disponibilidad = `quantity > 0`). La creación del carrito es responsabilidad del frontend | ✅ Implementado |
+| **Product Detail — pestañas de detalles/especificaciones** | `GET /api/products/{productIdOrSlug}` expone `description` (array de párrafos), `highlights` y `specs` (`[{label,value}]`), todos persistidos como JSON | ✅ Implementado |
 | **Product Detail — sección de reseñas** | Fuera de alcance: la maneja `review-service` | ➖ Otro servicio |
 | **Product Detail — sección "Related"** (productos de la misma categoría) | `GET /api/products?categoryId={misma}&page=&size=` (misma query del listado de categoría) | ✅ Implementado |
 | **Admin Productos** — ABM (`+ Nuevo producto`, editar, eliminar) | `POST /api/products`, `PUT /api/products[/{id}]`, `DELETE /api/products/{id}`, `GET /api/products/{id}` | ✅ Implementado |
 | **Admin Productos** — campos: nombre, precio, stock, categoría, SKU | `title`, `price`, `quantity`, `categoryId` (valida existencia), `sku` (único) | ✅ Implementado |
-| **Admin Productos** — campos: descripción, imágenes (subida), estado | Sin campos ni endpoints en el modelo actual (sólo `image_url` resuelto por seed/proxy) | ⚠️ `<a implementar>` |
+| **Admin Productos** — campos: descripción, imágenes (subida), estado | `description`, `highlights`, `images`, `specs` y `featured` ya se envían en el `ProductDto` de `POST`/`PUT`; la **subida** de archivos sigue pendiente (la galería se envía como JSON de URLs/claves) | ⚠️ Campos implementados; subida: `<a implementar>` |
 | **Admin Categorías** — ABM de categorías | `POST /api/categories`, `PUT /api/categories[/{id}]`, `DELETE /api/categories/{id}`, `GET /api/categories[/{id}]`; campos `name` + `description` | ✅ Implementado |
 | **Admin Resumen** — KPI "Stock bajo" (productos con menos de 5 unidades) | Los datos crudos existen (`GET /api/products` con filtro de cantidad), pero no hay endpoint de agregación ni filtro `quantityBelow` | ⚠️ `<a implementar>` |
