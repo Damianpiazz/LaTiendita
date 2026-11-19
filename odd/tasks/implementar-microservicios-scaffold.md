@@ -26,11 +26,11 @@ S7 — Limitación ambiental conocida (no blocking): Java 17 está disponible, p
 
 ## Tasks
 
-- T1 — S1, S2, S5b, S7 — `cart-service` — delegado (writer) — pending
-- T2 — S1, S3, S5b, S7 — `customer-service` — delegado (writer) — pending
-- T3 — S1, S4, S5b, S7 — `offer-service` — delegado (writer) — pending
-- T4 — S1, S5, S5b, S7 — `shipment-service` — delegado (writer) — pending
-- T5 — S1, S5b, S6 — consumidor `SHIPMENT_DISPATCHED` en `order-service` + gateway/Eureka/README — inline (padre) — pending
+- T1 — S1, S2, S5b, S7 — `cart-service` — delegado (writer) — DONE — commit `e7cc885`
+- T2 — S1, S3, S5b, S7 — `customer-service` — delegado (writer) — DONE — commit `0b9a67b`
+- T3 — S1, S4, S5b, S7 — `offer-service` — delegado (writer) — DONE — commit `41d6804`
+- T4 — S1, S5, S5b, S7 — `shipment-service` — delegado (writer) — DONE — commit `fa0853b`
+- T5 — S1, S5b, S6 — consumidor `SHIPMENT_DISPATCHED` en `order-service` + gateway/Eureka/README — inline (padre) — DONE — commit `e2a95ee`
 
 Route evidence: mapa de patrones delegado a `gentle-ai-explore` (presupuesto inline excedido). Writers por servicio porque hay 4 unidades independientes con superficies de edición disjuntas, lanzadas juntas (Writer trigger a); cada una es sustancialmente más pesada que arrancar un subagent. El padre posee git, el consumidor en `order-service` y los archivos compartidos (T5), con un seam check al final. Delivery forecast: ~1200-1600 líneas autorizadas → `auto-chain` con `feature-branch-chain`; se registrarán límites de slice en el Log.
 
@@ -55,3 +55,23 @@ L8 — 2026-11-19 — Se lanzan writers para T1 y T2 en paralelo (superficies di
 L9 — 2026-11-19 — T5 COMPLETADO (padre, inline, verificado): RED observado en `ShipmentDispatchedConsumerTest` (clase inexistente) → implementado `ShipmentDispatchedEvent` + `ShipmentDispatchedConsumer` → GREEN. Patrón idéntico a `PaymentApprovedConsumer`: `@KafkaListener` topic `shipment-events`, lee `type`, descarta malformados, idempotente (solo `PAID` → `SHIPPED`), lanza `IllegalStateException` si el pedido no existe para reintento de Kafka. Rutas gateway [5]–[8] agregadas (carts, customers, offers, shipments) con `lb://<service>`. README actualizado (diagrama, tabla de estado, mensajería, árbol, próximos pasos, nota Docker). Verificación: `order-service` `mvnw -q -DskipTests package` EXIT 0; `mvnw -q test -Dtest=ShipmentDispatchedConsumerTest,PaymentApprovedConsumerTest,OrderServiceTest,ProductClientTest` EXIT 0; `git diff --check` EXIT 0 (solo warnings LF→CRLF de archivos que los writers están tocando). Sin commit aún.
 
 L10 — 2026-11-19 — Nota de superficie: los writers están modificando sus directorios en el mismo worktree (superficies disjuntas por directorio de servicio). `git status` ya muestra archivos nuevos en cart/customer mientras T5 se verificaba; sin solapamiento con order/gateway/README.
+
+L11 — 2026-11-19 — T2 DONE: writer reportó RED (testCompile: paquete `customer` y clases `OutboxWriter`/`OutboxRelay`/`UserRegisteredConsumer` inexistentes) → GREEN (3 suites Mockito). Spot check del padre: `mvnw -q test -Dtest=CustomerServiceTest,OutboxRelayTest,UserRegisteredConsumerTest` EXIT 0; grep sin `freeShipping`/seeders/direcciones. Work-unit commit `0b9a67b feat(customer): implementar microservicio de clientes con outbox y consumidor idempotente`.
+
+L12 — 2026-11-19 — T1 DONE: writer reportó RED (21 tests: 7 failures, 13 errors, 1 pass) → GREEN (21 tests, 0 failures, 0 errors). Spot check del padre: `mvnw -q test -Dtest=CartServiceTest,ProductEventsConsumerTest` EXIT 0; grep sin `freeShipping`/seeders. Work-unit commit `e7cc885 feat(cart): implementar microservicio de carrito con cliente de productos y consumidor de eventos`. Contrato: `POST /api/carts/items` responde `200 CartDto` según el doc autoritativo; la nota de `201`/`Location` del handoff queda descartada a favor del doc. `itemCount` = suma de cantidades; `total` excluye envío.
+
+L13 — 2026-11-19 — Se lanza T4 (shipment) con el payload de `SHIPMENT_DISPATCHED` fijado al consumidor ya implementado en order-service (`type`, `shipmentId`, `orderId`, `customerId`, `dispatchedAt`, `estimatedTo`, `occurredAt`). Estructura plana confirmada: `services/shipment-service/pom.xml` sin carpeta anidada. Cupo de 2 background tasks ocupado por T3 y T4.
+
+L14 — 2026-11-19 — T3 DONE: writer reportó RED (`cannot find symbol` en services/entidades/DTOs) → GREEN (33 tests, 0 failures/errors). Spot check del padre: `mvnw -q test -Dtest=PromotionEvaluationServiceTest,CouponServiceTest,OutboxRelayTest,OrderCreatedConsumerTest,PromotionServiceTest` EXIT 0; grep sin `FREE_SHIPPING`/`freeShipping`/seeders. Work-unit commit `41d6804 feat(offer): implementar microservicio de ofertas con evaluacion, cupones y outbox`. Notas del writer (advisory, no bloqueantes): `ORDER_CREATED` no trae `couponCode`, así que el registro de uso se omite cuando falta; `usageCount` se reporta pero no se aplica un máximo porque el contrato no define campo de uso máximo.
+
+L15 — 2026-11-19 — Se lanza el verificador independiente (`gentle-ai-verify`) para el feature completo con baseline `a022354`. Debido a que T3/T4 aún escribían al lanzarlo, se le pedirá una segunda pasada sobre el estado final cuando ambos terminen, para que ningún hallazgo se base en archivos parciales.
+
+L16 — 2026-11-19 — Verificador: veredicto INTERIM PASS para T1/T2/T3/T5, cero blockers; S1/S5/S5b en hold por T4. Probes: package y suites Mockito EXIT 0 en cart/customer/offer/order; `git diff --check` EXIT 0; sin `freeShipping`/`FREE_SHIPPING`, sin seeders, sin direcciones en customer; scope confinado a las superficies autorizadas.
+
+L17 — 2026-11-19 — RDD está ON (decisión global). `gentle-ai review assess --base-ref a022354 --committed-only --json` devolvió `high`/`unassessable` por los archivos untracked de T5 y T4 (aún mutando), con `review_due: true`. Según el contrato, un assess fallido NO baja el riesgo: se mantiene high. Se difiere el preflight STATUS y la consent hasta que T4 esté completa, T5 commiteado y el candidate congelado, para que el inventario de untracked sea estable y la revisión cubra el slice completo en una sola transacción. Lentes previstas: `risk`, `resilience`, `readability`, `reliability` (4R).
+
+L18 — 2026-11-19 — T4 DONE: writer reportó RED (testCompile sin clases/Dependencias) → RED (test `markDelivered` inexistente) → GREEN (7 suites). Spot check del padre: `mvnw -q test -Dtest=QuoteServiceTest,OutboxRelayTest,ShipmentDispatchedPayloadTest,PaymentApprovedConsumerTest,OrderCancelledConsumerTest,DeliveryAddressServiceTest,ShipmentServiceTest` EXIT 0; grep sin `freeShipping`/seeders. Contrato cross-service verificado con codegraph: `shipmentService.event.ShipmentDispatchedEvent` y `orderService.order.dto.event.ShipmentDispatchedEvent` son idénticos en los 7 campos y tipos; `ShipmentService.dispatch()` publica a `shipment-events` con key `orderId`. Work-unit commit `fa0853b feat(shipment): implementar microservicio de envios con tarifa plana, direcciones y outbox`. Decisión de padre: se ACEPTA `POST /api/shipments/{id}/deliver` como extensión deliberada — el doc §2 no define ruta de confirmación de entrega pero §6.3 exige el evento `SHIPMENT_DELIVERED`, así que hace falta un trigger. `OrderClient` se mantiene tras interfaz y se mockea en tests locales (sin HTTP real local).
+
+L19 — 2026-11-19 — T5 DONE: work-unit commit `e2a95ee feat(gateway): cablear nuevos servicios y consumir SHIPMENT_DISPATCHED en pedidos` (5 archivos). Verificado pre-commit: `order-service` package EXIT 0; `mvnw -q test -Dtest=ShipmentDispatchedConsumerTest,PaymentApprovedConsumerTest,OrderServiceTest,ProductClientTest` EXIT 0; `git diff --check` EXIT 0. Los cinco work-units están completos: `0b9a67b` (customer), `e7cc885` (cart), `41d6804` (offer), `fa0853b` (shipment), `e2a95ee` (gateway/order/README). Sin push/PR/merge.
+
+L20 — 2026-11-19 — Candidate congelado en `e2a95ee`. Se envía la señal final al verificador para que revalide T4 y el contrato `SHIPMENT_DISPATCHED` sobre el estado final, y se reanuda el preflight STATUS de RDD (risk-high, lentes `risk,resilience,readability,reliability`).
