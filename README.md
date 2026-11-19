@@ -21,7 +21,11 @@ flowchart TB
     PR["productService<br/>BD: product"]
     OR["orderService<br/>BD: orders"]
     PA["paymentService<br/>BD: payment"]
-    PL["cart · customer · offer<br/>review · shipment<br/>(scaffold)"]
+    CA["cartService<br/>BD: cart"]
+    CU["customerService<br/>BD: customer"]
+    OF["offerService<br/>BD: offer"]
+    SH["shipmentService<br/>BD: shipment"]
+    RE["reviewService<br/>(scaffold)"]
   end
 
   subgraph DATA["Datos e integraciones"]
@@ -67,13 +71,16 @@ flowchart TB
 | Cliente | `frontend/` (Next.js, :3000) | Implementado | Modo mock por defecto (`NEXT_PUBLIC_USE_MOCKS=true`); consume `/api/**` del gateway |
 | Borde | `services/gateway/` (:8081) | Implementado | Valida JWT HS256 e issuer de Authorizer, aplica roles `admin`/`cliente`, CORS, rate limit, `X-Correlation-Id` e inyecta `X-User-Id`, `X-User-Email`, `X-User-Roles` |
 | Identidad | Authorizer 2.4.4 (:8080) | Implementado | Usuarios, roles y JWT; SQLite persistido en `runtime/docker/authorizer/data`. No se registra en Eureka |
-| Registro | `services/eureka-server/` (:8761) | Implementado | Descubrimiento de servicios; el gateway enruta con `lb://productService`, `lb://orderService`, `lb://paymentService` |
+| Registro | `services/eureka-server/` (:8761) | Implementado | Descubrimiento de servicios; el gateway enruta con `lb://productService`, `lb://orderService`, `lb://paymentService`, `lb://cartService`, `lb://customerService`, `lb://offerService`, `lb://shipmentService` |
 | Catálogo | `services/product-service/` | Implementado | PostgreSQL `product`; imágenes en Azure Blob Storage (container `productos`, Azurite en local) |
 | Pedidos | `services/order-service/` | Implementado | PostgreSQL `orders`; publica `order-events` con outbox transaccional y consume `payment-events` |
 | Pagos | `services/payment-service/` | Implementado | PostgreSQL `payment`; publica `payment-events` por outbox e integra Mercado Pago mediante webhook firmado |
-| Envíos | `services/shipment-service/` | Scaffold | PostgreSQL `shipment` y consumo de eventos: propuesto en `docs/microservicios/shipment-service.md` |
-| Carrito / Clientes / Ofertas / Reseñas | `services/{cart,customer,offer,review}-service/` | Scaffold | Bases `cart`, `customer`, `offer`, `review` (propuestas). Todavía sin endpoints ni rutas en el gateway |
-| Mensajería | Kafka (:9092) | Implementado para pedidos y pagos | `order-events` y `payment-events`; el outbox retiene eventos si el broker no responde |
+| Envíos | `services/shipment-service/` | Implementado | PostgreSQL `shipment`; tarifa plana, `delivery_addresses` como fuente única de direcciones, outbox `shipment-events` y consumo de `payment-events`/`order-events` |
+| Carrito | `services/cart-service/` | Implementado | PostgreSQL `cart`; snapshot de precio desde `product-service` y consumo de `product-events` |
+| Clientes | `services/customer-service/` | Implementado | PostgreSQL `customer`; alta idempotente por `X-User-Id`, outbox `customer-events` y consumo de `user-events`. Sin direcciones (son de envíos) |
+| Ofertas | `services/offer-service/` | Implementado | PostgreSQL `offer`; evaluación de promociones, outbox `promotion-events` y consumo de `order-events` |
+| Reseñas | `services/review-service/` | Scaffold | Propuesto en `docs/microservicios/review-service.md` (fuera de alcance actual) |
+| Mensajería | Kafka (:9092) | Implementado | `order-events`, `payment-events`, `shipment-events`, `customer-events` y `promotion-events` vía outbox transaccional; el outbox retiene eventos si el broker no responde. `order-service` consume `SHIPMENT_DISPATCHED` (`PAID` → `SHIPPED`) |
 | Objetos | Azure Blob Storage / Azurite (:10000) | Implementado en catálogo | `product-service` guarda la clave del blob en `image_url` y la resuelve en `GET /api/products/{id}/image` |
 | Observabilidad | Actuator + Prometheus + OTLP | Implementado | `/actuator/health`, `/actuator/prometheus`, trazas OTLP y logs estructurados |
 
@@ -100,11 +107,11 @@ LaTiendita/
 │   ├── product-service/
 │   ├── order-service/
 │   ├── payment-service/
-│   ├── cart-service/         # scaffold
-│   ├── customer-service/     # scaffold
-│   ├── offer-service/        # scaffold
+│   ├── cart-service/         # Spring Boot + PostgreSQL + Kafka consumer
+│   ├── customer-service/     # Spring Boot + PostgreSQL + outbox/Kafka
+│   ├── offer-service/        # Spring Boot + PostgreSQL + outbox/Kafka
 │   ├── review-service/       # scaffold
-│   └── shipment-service/     # scaffold
+│   └── shipment-service/     # Spring Boot + PostgreSQL + outbox/Kafka
 ├── runtime/
 │   ├── docker/               # compose + .env.example de Authorizer
 │   └── floci-az/             # emulador local de Azure + Terraform (aún vacío)
@@ -170,6 +177,8 @@ docker compose -f runtime/floci-az/compose.yaml up -d
 
 ## Estado actual y próximos pasos
 
-Implementado: gateway, Eureka, catálogo con object storage, pedidos y pagos con outbox/Kafka, y frontend en modo mock. Pendiente: completar los cinco scaffolds, agregar sus rutas en el gateway, el Terraform de `floci-az` y el compose local de PostgreSQL/Kafka/Azurite.
+Implementado: gateway (con rutas para los siete servicios), Eureka, catálogo con object storage, pedidos, pagos, carrito, clientes, ofertas y envíos con outbox/Kafka, y frontend en modo mock. Pendiente: completar el scaffold de reseñas, el Terraform de `floci-az` y el compose local de PostgreSQL/Kafka/Azurite.
+
+Nota de verificación: los tests de integración usan Testcontainers y requieren Docker en ejecución. La validación local de esta entrega se limitó a compilación y tests unitarios Mockito; los tests `@SpringBootTest` se ejecutan en CI con Docker disponible.
 
 Para profundizar, empezar por [`docs/microservicios/Template.md`](docs/microservicios/Template.md) y los contratos de cada servicio.
