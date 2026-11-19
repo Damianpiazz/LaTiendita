@@ -10,7 +10,7 @@ No gestiona el catálogo (pertenece a `product-service`), los pedidos (`order-se
 
 ## 2. Endpoints
 
-> **Propuesta de contrato; aún no implementado.** El servicio es scaffold (solo `ReviewServiceApplication` y su test). Este documento define el contrato propuesto para cumplir el wireframe de `docs/OpenPencil/LaTiendita.fig` (página "WireFrame").
+> **Contrato implementado.** El servicio expone todos los endpoints detallados abajo, con persistencia PostgreSQL, moderación, votos, promedio materializado, publicación de eventos vía outbox y consumo de `PRODUCT_DELETED`. El contrato cubre el wireframe de `docs/OpenPencil/LaTiendita.fig` (página "WireFrame").
 
 Todas las rutas son relativas a la raíz del servicio (ej. `http://reviewService:8080`). La identidad se resuelve con el header `X-User-Id` (inyectado por el gateway desde el JWT de Authorizer); la moderación exige el rol `admin` (header `X-User-Roles`).
 
@@ -26,7 +26,7 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://reviewService
 
 *Notas de integración:*
 - `GET /api/reviews` y `GET /api/reviews/summary` son de lectura pública (como `GET /api/products` en el gateway), para mostrar la sección "Reviews" del detalle de producto sin sesión.
-- El gateway aún no expone `/api/reviews/**` ni `/api/admin/reviews/**`; se deben agregar las rutas `Path=/api/reviews/**` → `lb://reviewService` y `Path=/api/admin/**` → `lb://reviewService` (con `hasRole("admin")`, como las rutas de escritura de `products`).
+- El gateway expone `/api/reviews/**` y `/api/admin/reviews/**` → `${REVIEW_SERVICE_BASE_URL:lb://reviewService}`. `GET /api/reviews/**` es pública; `/api/admin/reviews/**` exige `hasRole("admin")`; el resto de `/api/reviews/**` (crear reseña y votar útil) exige token válido.
 
 ---
 

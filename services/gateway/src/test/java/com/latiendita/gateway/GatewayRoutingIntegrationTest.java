@@ -78,6 +78,7 @@ class GatewayRoutingIntegrationTest {
         registry.add("PRODUCT_SERVICE_BASE_URL", () -> base);
         registry.add("ORDER_SERVICE_BASE_URL", () -> base);
         registry.add("PAYMENT_SERVICE_BASE_URL", () -> base);
+        registry.add("REVIEW_SERVICE_BASE_URL", () -> base);
     }
 
     @Autowired
@@ -151,6 +152,42 @@ class GatewayRoutingIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains("\"stub\":true");
+    }
+
+    @Test
+    void permiteSinTokenLaLecturaDeResenas() {
+        ResponseEntity<String> response = rest.getForEntity(
+                "/api/reviews?productId=42", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"stub\":true");
+        assertThat(lastRequestPath).isEqualTo("/api/reviews");
+    }
+
+    @Test
+    void rechazaSinTokenLaEscrituraDeResenas() {
+        ResponseEntity<String> response = rest.postForEntity("/api/reviews",
+                new HttpEntity<>(new HttpHeaders()), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void rechazaConTokenSinRolAdminLaModeracionDeResenas() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/admin/reviews", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteConRolAdminLaModeracionDeResenas() {
+        String token = TestJwtFactory.token(42, "admin");
+        rest.exchange("/api/admin/reviews", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(lastRequestPath).isEqualTo("/api/admin/reviews");
     }
 
     @Test

@@ -52,6 +52,10 @@ public class SecurityConfig {
                 .requestMatchers(PUBLIC_PATHS).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**")
                     .permitAll()
+                // Las lecturas de reseñas son públicas (sección "Reviews" del detalle
+                // de producto); la moderación administrativa exige el rol admin.
+                .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
+                .requestMatchers("/api/admin/reviews/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**")
                     .hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**")
