@@ -127,8 +127,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Borrado | Físico (`delete`) en ambos modelos; no hay borrado lógico ni protección de referencias hacia productos al borrar una categoría |
 | Concurrencia | Ambas entidades usan `@Version`: actualizaciones concurrentes devuelven `409` |
 | Ordenamiento | `sort` validado contra allowlist (`SortValidator`) antes de tocar JPA |
-| Imágenes | `image_url` guarda la CLAVE del blob (no la URL absoluta), de modo que el storage pueda cambiarse sin migrar el dato; el `GET .../image` resuelve clave → bytes |
-| Seed | `CatalogSeedRunner` (`app.seed.enabled=true`) carga `seed/categories.json`, `seed/products.json` y sube `seed/images/<SKU>.*` (jpg/jpeg/png/webp/gif) al storage con clave `productos/<SKU>.<ext>`, idempotente: existentes se omiten y las imágenes se re-subben con `overwrite=true`. Best-effort: un storage caído no detiene el arranque |
+| Imágenes | `image_url` guarda la CLAVE del blob (no la URL absoluta), de modo que el storage pueda cambiarse sin migrar el dato; el `GET .../image` resuelve clave → bytes. La galería se gestiona como JSON desde la API (§4.4); no hay seeders |
 
 ### 4.4 DTOs (contratos de API)
 
@@ -155,8 +154,6 @@ Campos derivados de las entidades de §4.1 y de lo que consumen las pantallas de
 | `SPRING_DATASOURCE_PASSWORD` | Password de la base de datos | ✅ | — | *(secret)* |
 | `EUREKA_URL` | URL del registro Eureka | ❌ | `http://localhost:8761/eureka` | `http://eureka:8761/eureka` |
 | `EUREKA_ENABLED` | Habilita el registro en Eureka | ❌ | `true` | `true` |
-| `APP_SEED_ENABLED` | Activa el seed de categorías/productos/imágenes | ❌ | `false` | `true` |
-| `APP_SEED_LOCATION` | Directorio externo con los JSON de seed (vacío = classpath embebido) | ❌ | *(vacío)* | `/data/seed` |
 | `AZURE_STORAGE_ENDPOINT` | Endpoint de Azure Blob Storage (Azurite en local) | ❌ | `http://localhost:10000/devstoreaccount1` | `http://azurite:10000/devstoreaccount1` |
 | `AZURE_STORAGE_ACCOUNT` | Cuenta de storage | ❌ | `devstoreaccount1` | `devstoreaccount1` |
 | `AZURE_STORAGE_KEY` | Key de la cuenta; **vacío ⇒ storage deshabilitado** (permite arrancar/testear sin credenciales) | ✅ (en k8s) | *(vacío)* | *(secret)* |
@@ -198,7 +195,7 @@ Campos derivados de las entidades de §4.1 y de lo que consumen las pantallas de
 | Dependencia | Tipo | Para qué | Crítica | Comportamiento si cae |
 |---|---|---|---|---|
 | PostgreSQL | Base de datos | Persistencia principal (`ddl-auto=update`) | ✅ Sí | `readiness` en `DOWN` (el group incluye `db`) |
-| Azure Blob Storage (Azurite en local) | Almacenamiento de objetos | Imágenes de producto (`ImageStorageService`) | ❌ No | Arranque y lecturas continúan: `@PostConstruct` best-effort, `download` devuelve `404` y el seed loguea el error sin detenerse |
+| Azure Blob Storage (Azurite en local) | Almacenamiento de objetos | Imágenes de producto (`ImageStorageService`) | ❌ No | Arranque y lecturas continúan: `@PostConstruct` best-effort y `download` devuelve `404` |
 | Eureka | Registro de servicios | Descubrimiento para el gateway (`spring.application.name=productService`) | ❌ No | `EUREKA_ENABLED=false` para operar sin registro |
 | Collector OTLP | Observabilidad | Trazas y métricas (`/actuator/prometheus`, `/actuator/metrics`) | ❌ No | Sólo pierde observabilidad |
 

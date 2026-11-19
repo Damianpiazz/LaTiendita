@@ -171,7 +171,7 @@ docker compose -f runtime/floci-az/compose.yaml up -d
 - [ ] `docker compose -f runtime/docker/compose.yaml ps` muestra Authorizer en estado `healthy`.
 - [ ] `http://localhost:8761` muestra los servicios registrados.
 - [ ] `curl http://localhost:8081/actuator/health` responde `UP`.
-- [ ] `curl http://localhost:8081/api/products` devuelve el catálogo (seed habilitado con `APP_SEED_ENABLED=true`).
+- [ ] `curl http://localhost:8081/api/products` devuelve el catálogo.
 - [ ] `.\mvnw verify` pasa en cada servicio con código.
 - [ ] `npm run lint` y `npm run build` pasan en `frontend/`.
 
