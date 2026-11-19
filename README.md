@@ -1,81 +1,175 @@
-# La-Tiendita
+# LaTiendita
 
-## Azure local con floci-az + Terraform
+Tienda online distribuida: frontend **Next.js**, microservicios **Spring Boot**, descubrimiento con **Eureka**, un **API Gateway** como único punto de entrada y **Authorizer** como proveedor de identidad. Este README describe la arquitectura objetivo, qué piezas ya están implementadas y cómo levantar el entorno local.
 
-Los microservicios se despliegan como Azure Container Apps contra el emulador
-local [floci-az](https://github.com/floci-io/floci-az) (puerto 4577).
+> Los contratos detallados de cada servicio están en [`docs/microservicios/`](docs/microservicios/). El wireframe de diseño está en `docs/OpenPencil/LaTiendita.fig`.
 
-### 1. Levantar el emulador
+## Arquitectura objetivo
 
-```powershell
-docker compose up -d
-docker compose ps   # wait until STATUS: healthy
+Vista simplificada: **verde** = implementado, **gris** = scaffold, **azul** = infraestructura. Las líneas punteadas marcan componentes aún no implementados. Puertos e integraciones externas están en la tabla siguiente.
+
+```mermaid
+flowchart TB
+  FE["Frontend Next.js"]
+
+  GW["API Gateway<br/>JWT · RBAC · rate limit"]
+  AU[("Authorizer<br/>JWT + roles")]
+  EU[("Eureka")]
+
+  subgraph SVCS["Microservicios"]
+    direction LR
+    PR["productService<br/>BD: product"]
+    OR["orderService<br/>BD: orders"]
+    PA["paymentService<br/>BD: payment"]
+    PL["cart · customer · offer<br/>review · shipment<br/>(scaffold)"]
+  end
+
+  subgraph DATA["Datos e integraciones"]
+    direction LR
+    PG[("PostgreSQL<br/>una BD por servicio")]
+    MQ[("Kafka<br/>order-events · payment-events")]
+    OB[("Blob Storage<br/>imágenes")]
+  end
+
+  FE --> GW
+  GW --> AU
+  GW --> PR
+  GW --> OR
+  GW --> PA
+  GW -.-> PL
+
+  GW -->|"descubre"| EU
+  PR -->|"se registra"| EU
+  OR -->|"se registra"| EU
+  PA -->|"se registra"| EU
+
+  PR --> PG
+  PR --> OB
+  OR --> PG
+  OR --> MQ
+  PA --> PG
+  PA --> MQ
+  MQ -->|"PAYMENT_APPROVED"| OR
+  PL -.-> PG
+
+  classDef live fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+  classDef planned fill:#f5f5f5,stroke:#9e9e9e,color:#616161
+  classDef infra fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+  class FE,GW,AU,EU,PR,OR,PA live
+  class PL planned
+  class PG,MQ,OB infra
 ```
 
-### 2. Confiar el certificado TLS (una vez por máquina)
+### Componentes
 
-```powershell
-.\scripts\trust-cert.ps1
-```
+| Capa | Componente | Estado | Persistencia / responsabilidad |
+|---|---|---|---|
+| Cliente | `frontend/` (Next.js, :3000) | Implementado | Modo mock por defecto (`NEXT_PUBLIC_USE_MOCKS=true`); consume `/api/**` del gateway |
+| Borde | `services/gateway/` (:8081) | Implementado | Valida JWT HS256 e issuer de Authorizer, aplica roles `admin`/`cliente`, CORS, rate limit, `X-Correlation-Id` e inyecta `X-User-Id`, `X-User-Email`, `X-User-Roles` |
+| Identidad | Authorizer 2.4.4 (:8080) | Implementado | Usuarios, roles y JWT; SQLite persistido en `runtime/docker/authorizer/data`. No se registra en Eureka |
+| Registro | `services/eureka-server/` (:8761) | Implementado | Descubrimiento de servicios; el gateway enruta con `lb://productService`, `lb://orderService`, `lb://paymentService` |
+| Catálogo | `services/product-service/` | Implementado | PostgreSQL `product`; imágenes en Azure Blob Storage (container `productos`, Azurite en local) |
+| Pedidos | `services/order-service/` | Implementado | PostgreSQL `orders`; publica `order-events` con outbox transaccional y consume `payment-events` |
+| Pagos | `services/payment-service/` | Implementado | PostgreSQL `payment`; publica `payment-events` por outbox e integra Mercado Pago mediante webhook firmado |
+| Envíos | `services/shipment-service/` | Scaffold | PostgreSQL `shipment` y consumo de eventos: propuesto en `docs/microservicios/shipment-service.md` |
+| Carrito / Clientes / Ofertas / Reseñas | `services/{cart,customer,offer,review}-service/` | Scaffold | Bases `cart`, `customer`, `offer`, `review` (propuestas). Todavía sin endpoints ni rutas en el gateway |
+| Mensajería | Kafka (:9092) | Implementado para pedidos y pagos | `order-events` y `payment-events`; el outbox retiene eventos si el broker no responde |
+| Objetos | Azure Blob Storage / Azurite (:10000) | Implementado en catálogo | `product-service` guarda la clave del blob en `image_url` y la resuelve en `GET /api/products/{id}/image` |
+| Observabilidad | Actuator + Prometheus + OTLP | Implementado | `/actuator/health`, `/actuator/prometheus`, trazas OTLP y logs estructurados |
 
-floci-az genera un certificado auto-firmado porque el provider `azurerm`
-descubre la nube por HTTPS. Sin este paso Terraform falla con
-`x509: certificate signed by unknown authority`.
+### Flujos clave
 
-### 3. Variables de entorno
+1. **Autenticación:** el frontend llama a `/api/auth/**`; el gateway reescribe hacia Authorizer (`/v1/**`), valida el JWT (firma + issuer) y propaga la identidad por headers. Los servicios confían en esos headers; no validan el token por sí mismos.
+2. **Catálogo:** `GET /api/products/**` y `/api/categories/**` son públicos y se resuelven vía Eureka. Las escrituras requieren rol `admin` y se deciden en el gateway.
+3. **Checkout y pago:** `POST /api/orders` persiste el pedido y escribe un evento en el outbox; el relay lo publica en `order-events`. `payment-service` recibe el webhook de Mercado Pago, actualiza su base y publica `PAYMENT_APPROVED` en `payment-events`; `order-service` lo consume para avanzar el pedido a pagado.
+4. **Imágenes:** el alta de productos guarda una clave de blob (no una URL absoluta) y el endpoint de imagen redirige URLs externas o hace proxy de los bytes del storage.
 
-Copiá `.env.example` a `.env` y completá los valores:
+## Estructura del repositorio
 
-```bash
-# ── floci-az ──────────────────────────────────────────────
-FLOCI_AZ_URL=http://localhost:4577
-
-# Standard devstoreaccount1 connection string (credentials are not validated in dev mode).
-# Point endpoints at `floci-az` (compose network) when your code runs inside a container.
-AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:4577/devstoreaccount1;QueueEndpoint=http://localhost:4577/devstoreaccount1-queue;TableEndpoint=http://localhost:4577/devstoreaccount1-table;"
-
-# ── Terraform ─────────────────────────────────────────────
-TF_VAR_location="eastus"
-TF_VAR_image_pedidos="latiendita/pedidos-api:local"
-```
-
-### 4. Desplegar los microservicios
-
-```powershell
-# The image must exist in the local daemon: floci-az starts replicas from it
-docker build -t latiendita/pedidos-api:local ./services/pedidos
-
-cd infra
-terraform init
-terraform apply
-```
-
-### 5. Invocar
-
-```powershell
-$FQDN = terraform -chdir=infra output -raw pedidos_fqdn
-curl -H "Host: $FQDN" http://localhost:4577/
-```
-
-The `Host` header is how floci-az routes the request to your app: every app
-shares port 4577, so the FQDN identifies the target.
-
-### 6. Consola web
-
-Abrir `http://localhost:4577/_floci/ui`
-
-### Estructura
-
-```
+```text
 LaTiendita/
-├── docker-compose.yml        # floci-az: TLS, Container Apps real mode, hybrid storage
-├── .env.example              # connection string + Terraform vars (see above)
-├── infra/                    # Terraform (azurerm → floci-az)
-│   ├── versions.tf
-│   ├── providers.tf          # environment = "stack", metadata_host = localhost:4577
-│   ├── variables.tf
-│   ├── main.tf               # resource group + managed env + pedidos-api
-│   └── outputs.tf
-├── scripts/trust-cert.ps1    # install floci-az cert in CurrentUser\Root
-└── services/pedidos/         # microservice + its Dockerfile
+├── docs/
+│   ├── microservicios/       # responsabilidades, APIs, BDD y eventos por servicio
+│   ├── OpenPencil/           # wireframe de la tienda y del panel de administración
+│   ├── design-system/        # tokens de diseño
+│   └── IA-SESSIONS/          # decisiones de arquitectura y herramientas
+├── frontend/                 # Next.js del storefront
+├── services/
+│   ├── gateway/              # API Gateway (Spring Cloud Gateway)
+│   ├── eureka-server/        # service registry
+│   ├── product-service/
+│   ├── order-service/
+│   ├── payment-service/
+│   ├── cart-service/         # scaffold
+│   ├── customer-service/     # scaffold
+│   ├── offer-service/        # scaffold
+│   ├── review-service/       # scaffold
+│   └── shipment-service/     # scaffold
+├── runtime/
+│   ├── docker/               # compose + .env.example de Authorizer
+│   └── floci-az/             # emulador local de Azure + Terraform (aún vacío)
+└── odd/tasks/               # tareas de implementación del wireframe
 ```
+
+## Arranque local
+
+### 1. Authorizer
+
+```powershell
+Copy-Item runtime/docker/.env.example runtime/docker/.env
+# Completar AUTHORIZER_CLIENT_SECRET, AUTHORIZER_ADMIN_SECRET,
+# AUTHORIZER_JWT_SECRET y AUTHORIZER_ENCRYPTION_KEY
+docker compose -f runtime/docker/compose.yaml up -d
+docker compose -f runtime/docker/compose.yaml ps   # esperar a STATUS: healthy
+```
+
+Authorizer escucha solo en `127.0.0.1:8080`. El gateway usa el mismo `AUTHORIZER_JWT_SECRET` como `JWT_SECRET` y `AUTHORIZER_URL` como `JWT_ISSUER`.
+
+### 2. Infraestructura de datos
+
+El repositorio **no incluye todavía** un compose para PostgreSQL, Kafka ni Azurite: use instancias locales propias o Testcontainers para las pruebas. Los valores por defecto son `localhost:5432`, `localhost:9092` y `http://localhost:10000/devstoreaccount1`.
+
+Cada servicio requiere `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD`. El gateway requiere además `JWT_SECRET` y `JWT_ISSUER`; `product-service`, `AZURE_STORAGE_KEY` para habilitar el storage.
+
+### 3. Backends
+
+```powershell
+# En cada servicio con código: eureka-server, gateway, product, order, payment
+Set-Location services\product-service
+.\mvnw spring-boot:run
+```
+
+Eureka arranca en `:8761`, el gateway en `:8081` y los servicios de negocio en `:8080` (use `SERVER_PORT` si los levanta en la misma máquina).
+
+### 4. Frontend
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev          # http://localhost:3000, modo mock activo
+# NEXT_PUBLIC_USE_MOCKS=false y NEXT_PUBLIC_API_URL=http://localhost:8081 para usar el backend
+```
+
+### 5. Emulador de Azure (opcional)
+
+```powershell
+docker compose -f runtime/floci-az/compose.yaml up -d
+.\runtime\floci-az\scripts\trust-cert.ps1   # una vez por máquina
+```
+
+`floci-az` expone `127.0.0.1:4577` y su consola en `http://localhost:4577/_floci/ui`. Requiere certificado de confianza porque el provider `azurerm` descubre la nube por HTTPS. El directorio `runtime/floci-az/terraform/` hoy solo contiene `.gitkeep`: la infraestructura como código de Container Apps y storage aún está pendiente.
+
+## Verificación
+
+- [ ] `docker compose -f runtime/docker/compose.yaml ps` muestra Authorizer en estado `healthy`.
+- [ ] `http://localhost:8761` muestra los servicios registrados.
+- [ ] `curl http://localhost:8081/actuator/health` responde `UP`.
+- [ ] `curl http://localhost:8081/api/products` devuelve el catálogo (seed habilitado con `APP_SEED_ENABLED=true`).
+- [ ] `.\mvnw verify` pasa en cada servicio con código.
+- [ ] `npm run lint` y `npm run build` pasan en `frontend/`.
+
+## Estado actual y próximos pasos
+
+Implementado: gateway, Eureka, catálogo con object storage, pedidos y pagos con outbox/Kafka, y frontend en modo mock. Pendiente: completar los cinco scaffolds, agregar sus rutas en el gateway, el Terraform de `floci-az` y el compose local de PostgreSQL/Kafka/Azurite.
+
+Para profundizar, empezar por [`docs/microservicios/Template.md`](docs/microservicios/Template.md) y los contratos de cada servicio.
