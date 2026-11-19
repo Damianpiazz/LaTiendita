@@ -1,38 +1,302 @@
-# Uso: docker compose -f runtime/docker/compose.yaml up -d
-# Authorizer v2 recibe TODA la config por CLI flags (no lee .env ni env vars);
-# docker compose interpola el .env de este directorio hacia los flags.
+# Arranque: docker compose -f runtime/docker/compose.yaml up -d
+# Copiar antes: cp runtime/docker/.env.example runtime/docker/.env
+# Los servicios de negocio NO publican puerto en el host: solo se accede por gateway.
 name: latiendita-docker
 
+x-app-build: &app-build
+  context: ../../services
+  dockerfile: Dockerfile.spring
+
+x-app-env: &app-env
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-tienda}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Definí POSTGRES_PASSWORD en runtime/docker/.env}
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  EUREKA_URL: http://eureka-server:8761/eureka
+
+x-app-health: &app-health
+  test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:$$SERVER_PORT/actuator/health || exit 1"]
+  interval: 10s
+  timeout: 3s
+  retries: 10
+  start_period: 60s
+
+x-db-dep: &db-dep
+  postgres:
+    condition: service_healthy
+  kafka:
+    condition: service_healthy
+  eureka-server:
+    condition: service_healthy
+
 services:
+  postgres:
+    image: postgres:17.12-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tienda}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definí POSTGRES_PASSWORD en runtime/docker/.env}
+      POSTGRES_DB: latiendita
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d latiendita"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  kafka:
+    image: apache/kafka:4.3.2
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.38.0
+    restart: unless-stopped
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data", "--loose"]
+    ports:
+      - "127.0.0.1:10000:10000"
+    volumes:
+      - azurite-data:/data
+    healthcheck:
+      # Azurite responde 403 a la lista anónima; eso prueba que el puerto responde.
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:10000/devstoreaccount1?comp=list', () => process.exit(0)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   authorizer:
     image: quay.io/authorizer/authorizer:2.4.4
+    restart: unless-stopped
     ports:
-      # Loopback only: es el servidor de auth, no lo publiques a la red.
+      # Loopback only: el gateway lo alcanza por la red interna.
       - "127.0.0.1:8080:8080"
     volumes:
-      # SQLite persistido en el host; data/ ya está en .gitignore.
       - ./authorizer/data:/authorizer/data
     command:
-      # --url es obligatoria en v2: sin ella el server no arranca.
+      # Authorizer v2 recibe TODA la configuración por CLI flags.
       - --url=${AUTHORIZER_URL:?Copiá runtime/docker/.env.example a runtime/docker/.env}
-      # OAuth client obligatorio en v2.
       - --client-id=${AUTHORIZER_CLIENT_ID:?Falta AUTHORIZER_CLIENT_ID en .env}
       - --client-secret=${AUTHORIZER_CLIENT_SECRET:?Falta AUTHORIZER_CLIENT_SECRET en .env}
       - --admin-secret=${AUTHORIZER_ADMIN_SECRET:?Falta AUTHORIZER_ADMIN_SECRET en .env}
-      # JWT HS256 para la prueba de levantamiento; migrar a RS256 si hace falta.
       - --jwt-type=HS256
       - --jwt-secret=${AUTHORIZER_JWT_SECRET:?Falta AUTHORIZER_JWT_SECRET en .env}
-      # Cifrado en reposo (TOTP/OTP). Distinto de JWT_SECRET para poder rotar
-      # uno sin invalidar al otro.
       - --encryption-key=${AUTHORIZER_ENCRYPTION_KEY:?Falta AUTHORIZER_ENCRYPTION_KEY en .env}
-      # SQLite: cero contenedores extra para la prueba.
       - --database-type=sqlite
       - --database-url=/authorizer/data/data.db
-      # Customización LaTiendita.
       - --organization-name=LaTiendita
       - --roles=admin,cliente
       - --default-roles=cliente
       - --protected-roles=admin
-      # Aplicaciones con acceso (frontend Next.js + playground local).
-      - --allowed-origins=http://localhost:3000,http://localhost:8080
-    # La imagen ya define HEALTHCHECK contra /healthz (wget de busybox).
+      # Incluir la URL pública del frontend cuando se muestre por ngrok.
+      - --allowed-origins=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8081}
+
+  eureka-server:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: eureka-server
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8761
+    ports:
+      - "127.0.0.1:8761:8761"
+    healthcheck: *app-health
+
+  gateway:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: gateway
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SERVER_PORT: 8081
+      AUTHORIZER_BASE_URL: http://authorizer:8080
+      JWT_SECRET: ${AUTHORIZER_JWT_SECRET:?Falta AUTHORIZER_JWT_SECRET en .env}
+      JWT_ISSUER: ${AUTHORIZER_URL:?Falta AUTHORIZER_URL en .env}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8081}
+    ports:
+      - "127.0.0.1:8081:8081"
+    healthcheck: *app-health
+    depends_on:
+      authorizer:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+
+  product-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: product-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/product
+      AZURE_STORAGE_ENDPOINT: http://azurite:10000/devstoreaccount1
+      AZURE_STORAGE_ACCOUNT: devstoreaccount1
+      AZURE_STORAGE_KEY: ${AZURE_STORAGE_KEY:-Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==}
+      AZURE_STORAGE_CONTAINER: productos
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  order-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: order-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  payment-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: payment-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment
+      ORDER_SERVICE_BASE_URL: http://order-service:8080
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN:-}
+      MERCADO_PAGO_WEBHOOK_SECRET: ${MERCADO_PAGO_WEBHOOK_SECRET:-}
+      MERCADO_PAGO_NOTIFICATION_URL: ${MERCADO_PAGO_NOTIFICATION_URL:-}
+    healthcheck: *app-health
+    depends_on:
+      <<: *db-dep
+      order-service:
+        condition: service_healthy
+
+  cart-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: cart-service/cartService
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cart
+      PRODUCT_SERVICE_BASE_URL: http://product-service:8080
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  customer-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: customer-service/customerService
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/customer
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  offer-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: offer-service/offerService
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/offer
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  shipment-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: shipment-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shipment
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  review-service:
+    build:
+      <<: *app-build
+      args:
+        MODULE_PATH: review-service/reviewService
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/review
+    healthcheck: *app-health
+    depends_on: *db-dep
+
+  ngrok:
+    image: ngrok/ngrok:3.39.13-alpine
+    restart: unless-stopped
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+      NGROK_FRONTEND_DOMAIN: ${NGROK_FRONTEND_DOMAIN:-}
+      NGROK_GATEWAY_DOMAIN: ${NGROK_GATEWAY_DOMAIN:-}
+    extra_hosts:
+      # Necesario en Linux; en Docker Desktop ya resuelve al host.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ngrok/ngrok.template.yml:/etc/ngrok/ngrok.template.yml:ro
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ -z "$$NGROK_AUTHTOKEN" ]; then
+          echo "NGROK_AUTHTOKEN vacío: túnel público desactivado";
+          exec sleep infinity;
+        fi
+        cp /etc/ngrok/ngrok.template.yml /tmp/ngrok.yml
+        for spec in "FRONTEND_DOMAIN_PLACEHOLDER:$$NGROK_FRONTEND_DOMAIN" "GATEWAY_DOMAIN_PLACEHOLDER:$$NGROK_GATEWAY_DOMAIN"; do
+          placeholder=$${spec%%:*}
+          domain=$${spec#*:}
+          if [ -n "$$domain" ]; then
+            sed -i "s|$$placeholder|$$domain|" /tmp/ngrok.yml
+          else
+            sed -i "/$$placeholder/d" /tmp/ngrok.yml
+          fi
+        done
+        exec ngrok start --all --config /tmp/ngrok.yml --log=stdout --log-format=logfmt
+    ports:
+      - "127.0.0.1:4040:4040"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  kafka-data:
+  azurite-data:

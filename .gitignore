@@ -7,8 +7,9 @@
 /data/
 floci-az.crt
 
-# Authorizer signing keys (never commit)
+# Authorizer signing keys and SQLite state (never commit)
 runtime/*/authorizer/keys/
+runtime/docker/authorizer/data/
 
 # Terraform
 .terraform/

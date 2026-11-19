@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1.7
+# One parameterized image for all 10 Spring Boot modules.
+# Build from the services/ directory with --build-arg MODULE_PATH=<path>.
+FROM maven:3.9.16-eclipse-temurin-17 AS build
+
+WORKDIR /build
+ARG MODULE_PATH=product-service
+
+# Dependency layer: only the pom changes invalidate it, not the source code.
+# The BuildKit cache mount keeps ~/.m2 across builds and across all modules.
+COPY ${MODULE_PATH}/pom.xml ./pom.xml
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -q -DskipTests dependency:go-offline
+
+COPY ${MODULE_PATH}/src ./src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -q -DskipTests -Dmaven.test.skip=true package \
+ && cp target/*.jar /app.jar
+
+FROM eclipse-temurin:17-jre-alpine-3.23 AS runtime
+
+ENV SERVER_PORT=8080 \
+    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+
+RUN addgroup -S app && adduser -S -G app app
+COPY --from=build --chown=app:app /app.jar /app.jar
+USER app
+
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=10 \
+    CMD wget -q --spider "http://127.0.0.1:${SERVER_PORT}/actuator/health" || exit 1
+
+ENTRYPOINT ["java", "-jar", "/app.jar"]

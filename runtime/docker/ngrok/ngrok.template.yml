@@ -1,0 +1,20 @@
+# ngrok agent config v3. The Compose service renders this file into /tmp and
+# removes the domain placeholders when no reserved domain is configured.
+# With no reserved domain, ngrok assigns a random public URL on every start.
+version: 3
+
+agent:
+  metadata: latiendita-dev
+
+endpoints:
+  - name: frontend
+    url: FRONTEND_DOMAIN_PLACEHOLDER
+    upstream:
+      # The Next.js frontend runs on the host, outside Docker.
+      url: host.docker.internal:3000
+
+  - name: gateway
+    url: GATEWAY_DOMAIN_PLACEHOLDER
+    upstream:
+      # Public entry for /api/webhooks/mercado-pago and customer demos.
+      url: gateway:8081

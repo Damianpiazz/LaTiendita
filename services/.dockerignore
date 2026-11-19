@@ -1,0 +1,12 @@
+**/target/
+**/.git/
+**/node_modules/
+**/.next/
+**/src/test/
+**/mvnw
+**/mvnw.cmd
+**/.mvn/
+**/*.md
+**/.env
+**/.env.*
+**/docker-compose*.y*ml

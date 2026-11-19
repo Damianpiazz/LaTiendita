@@ -79,7 +79,7 @@ flowchart TB
 | Carrito | `services/cart-service/` | Implementado | PostgreSQL `cart`; snapshot de precio desde `product-service` y consumo de `product-events` |
 | Clientes | `services/customer-service/` | Implementado | PostgreSQL `customer`; alta idempotente por `X-User-Id`, outbox `customer-events` y consumo de `user-events`. Sin direcciones (son de envíos) |
 | Ofertas | `services/offer-service/` | Implementado | PostgreSQL `offer`; evaluación de promociones, outbox `promotion-events` y consumo de `order-events` |
-| Reseñas | `services/review-service/` | Scaffold | Propuesto en `docs/microservicios/review-service.md` (fuera de alcance actual) |
+| Reseñas | `services/review-service/` | Implementado | PostgreSQL `review`; outbox `review-events` y consumo de `order-events` |
 | Mensajería | Kafka (:9092) | Implementado | `order-events`, `payment-events`, `shipment-events`, `customer-events` y `promotion-events` vía outbox transaccional; el outbox retiene eventos si el broker no responde. `order-service` consume `SHIPMENT_DISPATCHED` (`PAID` → `SHIPPED`) |
 | Objetos | Azure Blob Storage / Azurite (:10000) | Implementado en catálogo | `product-service` guarda la clave del blob en `image_url` y la resuelve en `GET /api/products/{id}/image` |
 | Observabilidad | Actuator + Prometheus + OTLP | Implementado | `/actuator/health`, `/actuator/prometheus`, trazas OTLP y logs estructurados |
@@ -102,6 +102,7 @@ LaTiendita/
 │   └── IA-SESSIONS/          # decisiones de arquitectura y herramientas
 ├── frontend/                 # Next.js del storefront
 ├── services/
+│   ├── Dockerfile.spring     # imagen compartida de los 10 módulos Spring Boot
 │   ├── gateway/              # API Gateway (Spring Cloud Gateway)
 │   ├── eureka-server/        # service registry
 │   ├── product-service/
@@ -113,71 +114,98 @@ LaTiendita/
 │   ├── review-service/       # scaffold
 │   └── shipment-service/     # Spring Boot + PostgreSQL + outbox/Kafka
 ├── runtime/
-│   ├── docker/               # compose + .env.example de Authorizer
-│   └── floci-az/             # emulador local de Azure + Terraform (aún vacío)
+│   ├── docker/               # compose, ngrok, PostgreSQL init y .env.example
+│   └── floci-az/             # emulador alternativo (fuera del runtime actual)
 └── odd/tasks/               # tareas de implementación del wireframe
 ```
 
 ## Arranque local
 
-### 1. Authorizer
+El backend completo corre en Docker. El frontend Next.js se ejecuta **fuera** de Docker, en el host, y se publica con el mismo túnel ngrok.
+
+### 1. Configurar y levantar
 
 ```powershell
 Copy-Item runtime/docker/.env.example runtime/docker/.env
-# Completar AUTHORIZER_CLIENT_SECRET, AUTHORIZER_ADMIN_SECRET,
-# AUTHORIZER_JWT_SECRET y AUTHORIZER_ENCRYPTION_KEY
-docker compose -f runtime/docker/compose.yaml up -d
-docker compose -f runtime/docker/compose.yaml ps   # esperar a STATUS: healthy
+# Completar POSTGRES_PASSWORD, AUTHORIZER_CLIENT_SECRET, AUTHORIZER_ADMIN_SECRET,
+# AUTHORIZER_JWT_SECRET y AUTHORIZER_ENCRYPTION_KEY.
+docker compose -f runtime/docker/compose.yaml up -d --build
+docker compose -f runtime/docker/compose.yaml ps
 ```
 
-Authorizer escucha solo en `127.0.0.1:8080`. El gateway usa el mismo `AUTHORIZER_JWT_SECRET` como `JWT_SECRET` y `AUTHORIZER_URL` como `JWT_ISSUER`.
+`--build` solo hace falta la primera vez o después de cambiar un `pom.xml`. Las diez imágenes Spring Boot salen de un único `services/Dockerfile.spring` parametrizado por `MODULE_PATH`: la capa de dependencias Maven se descarga una sola vez y se reutiliza entre módulos mediante un caché mount de BuildKit.
 
-### 2. Infraestructura de datos
+### 2. Qué incluye el compose
 
-El repositorio **no incluye todavía** un compose para PostgreSQL, Kafka ni Azurite: use instancias locales propias o Testcontainers para las pruebas. Los valores por defecto son `localhost:5432`, `localhost:9092` y `http://localhost:10000/devstoreaccount1`.
+| Servicio | Imagen / build | Red Docker | Host |
+|---|---|---|---|
+| `postgres` | `postgres:17.12-alpine3.24` | `postgres:5432` | `127.0.0.1:5432` |
+| `kafka` | `apache/kafka:4.3.2` (KRaft, sin ZooKeeper) | `kafka:9092` | no publicado |
+| `azurite` | `mcr.microsoft.com/azure-storage/azurite:3.38.0` | `azurite:10000` | `127.0.0.1:10000` |
+| `authorizer` | `quay.io/authorizer/authorizer:2.4.4` | `authorizer:8080` | `127.0.0.1:8080` |
+| `eureka-server` | módulo local | `eureka-server:8761` | `127.0.0.1:8761` |
+| `gateway` | módulo local | `gateway:8081` | `127.0.0.1:8081` |
+| 8 microservicios | módulos locales | `:8080` (sin publicar) | no publicado |
+| `ngrok` | `ngrok/ngrok:3.39.13-alpine` | `host.docker.internal:3000`, `gateway:8081` | `127.0.0.1:4040` |
 
-Cada servicio requiere `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD`. El gateway requiere además `JWT_SECRET` y `JWT_ISSUER`; `product-service`, `AZURE_STORAGE_KEY` para habilitar el storage.
+PostgreSQL corre como un único cluster ligero con **una base por microservicio**: `product`, `orders`, `payment`, `shipment`, `customer`, `cart`, `offer` y `review`. El script `runtime/docker/postgres/init/01-databases.sh` las crea en el volumen inicial. Authorizer mantiene su SQLite en `runtime/docker/authorizer/data/`.
 
-### 3. Backends
+Kafka crea los topics automáticamente desde los servicios: `order-events`, `payment-events`, `shipment-events`, `product-events`, `customer-events`, `user-events`, `review-events` y `promotion-events`. No se publica en el host porque todos los consumidores viven dentro de la red Docker; para inspeccionarlo, use `docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list`.
 
-```powershell
-# En cada servicio con código: eureka-server, gateway, product, order, payment
-Set-Location services\product-service
-.\mvnw spring-boot:run
-```
+Azurite expone solo el servicio de blobs, que es lo que usa `product-service` (container `productos`). La clave de desarrollo es pública y está en `.env.example`. `runtime/floci-az` queda como alternativa no utilizada por este runtime.
 
-Eureka arranca en `:8761`, el gateway en `:8081` y los servicios de negocio en `:8080` (use `SERVER_PORT` si los levanta en la misma máquina).
-
-### 4. Frontend
+### 3. Frontend (fuera de Docker)
 
 ```powershell
 Set-Location frontend
 npm install
-npm run dev          # http://localhost:3000, modo mock activo
-# NEXT_PUBLIC_USE_MOCKS=false y NEXT_PUBLIC_API_URL=http://localhost:8081 para usar el backend
+$env:NEXT_PUBLIC_USE_MOCKS = 'false'
+$env:NEXT_PUBLIC_API_URL = 'http://localhost:8081'
+npm run dev          # http://localhost:3000
 ```
 
-### 5. Emulador de Azure (opcional)
+Para una demo pública, `NEXT_PUBLIC_API_URL` debe apuntar a la **URL pública del gateway** (no a `localhost`: el navegador del cliente resolvería `localhost` en su propia máquina). Las variables `NEXT_PUBLIC_*` se leen al iniciar Next.js, así que reinicie el frontend después de cambiarlas.
+
+### 4. Exposición pública automática con ngrok
+
+El servicio `ngrok` arranca con el compose y crea dos endpoints HTTP:
+
+- `frontend` → `host.docker.internal:3000` (el Next.js del host).
+- `gateway` → `gateway:8081` (para `POST /api/webhooks/mercado-pago` y para mostrar el sistema a un cliente).
+
+Configuración:
 
 ```powershell
-docker compose -f runtime/floci-az/compose.yaml up -d
-.\runtime\floci-az\scripts\trust-cert.ps1   # una vez por máquina
+# En runtime/docker/.env
+NGROK_AUTHTOKEN=tu_token
+# Opcional, recomendado para webhooks y demos estables:
+NGROK_FRONTEND_DOMAIN=tu-frontend.ngrok.app
+NGROK_GATEWAY_DOMAIN=tu-api.ngrok.app
 ```
 
-`floci-az` expone `127.0.0.1:4577` y su consola en `http://localhost:4577/_floci/ui`. Requiere certificado de confianza porque el provider `azurerm` descubre la nube por HTTPS. El directorio `runtime/floci-az/terraform/` hoy solo contiene `.gitkeep`: la infraestructura como código de Container Apps y storage aún está pendiente.
+Para ver las URLs asignadas:
 
-## Verificación
+```powershell
+docker compose -f runtime/docker/compose.yaml logs -f ngrok
+# o, en segundo plano: curl http://localhost:4040/api/tunnels
+```
 
-- [ ] `docker compose -f runtime/docker/compose.yaml ps` muestra Authorizer en estado `healthy`.
+Sin `NGROK_AUTHTOKEN`, el contenedor queda inactivo (`sleep infinity`) y el resto del stack funciona igual. Sin dominios reservados, ngrok genera una URL nueva en cada reinicio: actualice `CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_URL` y `MERCADO_PAGO_NOTIFICATION_URL` cuando eso ocurra. Con dominios reservados esos valores quedan fijos. El webhook de Mercado Pago debe registrarse como `<URL_PUBLICA_DEL_GATEWAY>/api/webhooks/mercado-pago`.
+
+### 5. Verificación
+
+- [ ] `docker compose -f runtime/docker/compose.yaml config --quiet` valida el stack.
+- [ ] `docker compose -f runtime/docker/compose.yaml ps` muestra todos los servicios `healthy` (salvo `ngrok` si no hay token).
 - [ ] `http://localhost:8761` muestra los servicios registrados.
 - [ ] `curl http://localhost:8081/actuator/health` responde `UP`.
 - [ ] `curl http://localhost:8081/api/products` devuelve el catálogo.
-- [ ] `.\mvnw verify` pasa en cada servicio con código.
+- [ ] `docker compose exec postgres psql -U tienda -d latiendita -c '\l'` lista las ocho bases.
+- [ ] `curl http://localhost:4040/api/tunnels` lista los dos endpoints cuando hay token.
 - [ ] `npm run lint` y `npm run build` pasan en `frontend/`.
 
 ## Estado actual y próximos pasos
 
-Implementado: gateway (con rutas para los siete servicios), Eureka, catálogo con object storage, pedidos, pagos, carrito, clientes, ofertas y envíos con outbox/Kafka, y frontend en modo mock. Pendiente: completar el scaffold de reseñas, el Terraform de `floci-az` y el compose local de PostgreSQL/Kafka/Azurite.
+El runtime local incluye Authorizer, PostgreSQL con una base por servicio, Kafka KRaft, Azurite, Eureka, gateway, los ocho microservicios de negocio y el túnel público ngrok. El frontend permanece fuera de Docker y se publica desde el host. Pendiente fuera de este alcance: el Terraform de `floci-az`, la observabilidad con un colector OTLP y la sustitución de ngrok por un ingress en producción.
 
 Nota de verificación: los tests de integración usan Testcontainers y requieren Docker en ejecución. La validación local de esta entrega se limitó a compilación y tests unitarios Mockito; los tests `@SpringBootTest` se ejecutan en CI con Docker disponible.
 
