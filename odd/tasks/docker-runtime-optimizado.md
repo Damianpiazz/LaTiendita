@@ -40,6 +40,8 @@ Checks: lectura estructural del README actualizado; `docker compose config --qui
 - T3 — S3 — inline — Config ngrok + servicio en Compose + variables.
 - T4 — S4 — inline — README y verificación final.
 
+Work unit commit: `d573266` — `refactor(docker): optimizar el stack con Dockerfile compartido y tuneles ngrok` (19 archivos, +503/-233). Estrategia `single-pr`: un único work unit lógico; el usuario no pidió PR, no se encadena.
+
 Route declaration: directo inline. No hay writer reason (una sola unidad coherente de runtime, sin edit surfaces paralelos) y el contexto del mapa cabe en la sesión. Test-first: no aplica RED preexistente para archivos de configuración declarativa; se sustituye por validación estructural y smoke checks.
 
 Forecast de líneas autoras: ~540 (Dockerfile 60, compose 300, ngrok 25, SQL 25, env 60, README 70). Estrategia `single-pr`: un único work unit lógico, sin PRs encadenados (el usuario no pidió PR).
