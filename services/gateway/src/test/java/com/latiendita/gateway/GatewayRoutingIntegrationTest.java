@@ -191,6 +191,25 @@ class GatewayRoutingIntegrationTest {
     }
 
     @Test
+    void rechazaConTokenSinRolAdminElListadoAdminDePedidos() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/orders/admin", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteConRolAdminElListadoAdminDePedidos() {
+        String token = TestJwtFactory.token(42, "admin");
+        ResponseEntity<String> response = rest.exchange("/api/orders/admin", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastRequestPath).isEqualTo("/api/orders/admin");
+    }
+
+    @Test
     void propagaLosRolesDelTokenComoXRolsHeader() {
         String token = TestJwtFactory.token(42, "admin", "cliente");
         rest.exchange("/api/orders", HttpMethod.GET,

@@ -56,6 +56,8 @@ public class SecurityConfig {
                 // de producto); la moderación administrativa exige el rol admin.
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 .requestMatchers("/api/admin/reviews/**").hasRole(ADMIN_ROLE)
+                // Las consultas globales del admin de pedidos no son del cliente actual.
+                .requestMatchers("/api/orders/admin/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**")
                     .hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**")
