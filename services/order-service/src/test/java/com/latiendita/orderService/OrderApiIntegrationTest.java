@@ -180,6 +180,52 @@ class OrderApiIntegrationTest {
         assertThat(event.getPayload()).contains("\"productId\":42", "\"unitPrice\":999.99");
     }
 
+    @Test
+    void shouldListAllCustomersOrdersForAdmin() throws Exception {
+        orderRepository.saveAll(List.of(
+                order("1", OrderStatus.PENDING, "10.00"),
+                order("2", OrderStatus.PAID, "20.00")));
+
+        mockMvc.perform(get("/api/orders/admin").header("X-User-Id", "admin-1")
+                        .header("X-User-Roles", "cliente,admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void shouldRejectAdminListWithoutAdminRole() throws Exception {
+        mockMvc.perform(get("/api/orders/admin").header("X-User-Id", "1")
+                        .header("X-User-Roles", "cliente"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Acceso denegado"));
+    }
+
+    @Test
+    void shouldReturnAdminSummaryWithOrderKpis() throws Exception {
+        mockMvc.perform(get("/api/orders/admin/summary").header("X-User-Id", "admin-1")
+                        .header("X-User-Roles", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.salesByDay.length()").value(7))
+                .andExpect(jsonPath("$.recentOrders").isArray())
+                .andExpect(jsonPath("$.pendingOrders").isNumber())
+                .andExpect(jsonPath("$.pendingWithoutPayment").isNumber());
+    }
+
+    @Test
+    void shouldAllowAdminToChangeStatusOfThirdPartyOrder() throws Exception {
+        OrderEntity persisted = orderRepository.save(order("2", OrderStatus.PENDING, "50.00"));
+
+        mockMvc.perform(post("/api/orders/{id}/status", persisted.getId())
+                        .header("X-User-Id", "admin-1")
+                        .header("X-User-Roles", "admin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PAID\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.customerId").value("2"));
+    }
+
     private OrderEntity order(String customerId, OrderStatus status, String total) {
         OrderEntity order = OrderEntity.builder()
                 .orderNumber(UUID.randomUUID().toString())

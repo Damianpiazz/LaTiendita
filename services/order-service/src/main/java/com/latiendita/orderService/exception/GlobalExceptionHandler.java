@@ -22,8 +22,8 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, "Producto no encontrado", ex.getMessage());
     }
 
-    @ExceptionHandler(OrderAccessDeniedException.class)
-    public ProblemDetail onAccessDenied(OrderAccessDeniedException ex) {
+    @ExceptionHandler({OrderAccessDeniedException.class, AdminRoleRequiredException.class})
+    public ProblemDetail onAccessDenied(RuntimeException ex) {
         return problem(HttpStatus.FORBIDDEN, "Acceso denegado", ex.getMessage());
     }
 

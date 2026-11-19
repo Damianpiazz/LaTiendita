@@ -225,6 +225,25 @@ class OrderServiceTest {
     }
 
     @Test
+    void shouldAllowAdminToChangeStatusOfAnotherCustomersOrder() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-User-Id", "admin-1");
+        request.addHeader("X-User-Roles", "cliente,admin");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        OrderEntity otherCustomer = order("999", OrderStatus.PENDING, "10.00");
+        otherCustomer.setId(5L);
+        when(orderRepository.findWithItemsById(5L)).thenReturn(Optional.of(otherCustomer));
+        when(orderRepository.save(any(OrderEntity.class))).thenAnswer(invocation ->
+                invocation.getArgument(0));
+
+        OrderResponse response = orderService.changeStatus(5L, OrderStatus.PAID);
+
+        assertThat(response.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.customerId()).isEqualTo("999");
+    }
+
+    @Test
     void shouldRejectInvalidTransition() {
         OrderEntity pending = order(CUSTOMER, OrderStatus.PENDING, "10.00");
         when(orderRepository.findWithItemsById(5L)).thenReturn(Optional.of(pending));

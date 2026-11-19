@@ -21,6 +21,10 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://orderService:
 | `GET` | `/api/orders/{orderId}` | Obtiene un pedido con sus ítems (sólo si es del usuario) | — | `200` OrderResponse | Sí (dueño) |
 | `POST` | `/api/orders/{orderId}/status` | Cambia el estado del pedido según la máquina de transiciones (`CANCELLED` no está permitido acá) | `UpdateOrderStatusRequest` | `200` OrderResponse | Sí (dueño) |
 | `POST` | `/api/orders/{orderId}/cancel` | Cancela un pedido (`PENDING` o `PAID`), con motivo opcional | `CancelOrderRequest` | `200` OrderResponse | Sí (dueño) |
+| `GET` | `/api/orders/admin` | Listado **global** de pedidos (filtros `status`, `from`, `to`) para el Admin Pedidos | — | `200` Page\<AdminOrderResponse\> | Sí (admin) |
+| `GET` | `/api/orders/admin/summary` | KPIs del Admin Resumen derivados de `orders` | — | `200` AdminOrderSummaryResponse | Sí (admin) |
+
+El `POST /api/orders/{orderId}/status` acepta además a un `admin` sobre pedidos de terceros: el servicio comprueba el rol propagado por el gateway y omite la verificación de propiedad **sólo** para ese endpoint. La lectura y la cancelación siguen exigiendo ser el dueño.
 
 **Formatos de request:**
 
@@ -35,13 +39,15 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://orderService:
 { "reason": "Me arrepentí" }                                          // reason opcional, máx. 500
 ```
 
-### 2.1 Endpoints pendientes
+### 2.1 Endpoints del admin
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
-| `GET` | `/api/orders/admin` (o `/api/orders?status=&from=&to=`) | Listado **global** de pedidos para la tabla del Admin Pedidos (hoy `GET /api/orders` sólo devuelve los del usuario actual) | `<a implementar>` |
-| `GET` | `/api/orders/admin/summary` | KPIs del Admin Resumen: ventas de hoy (monto + cantidad), pedidos pendientes (incl. sin pago acreditado), serie de 7 días (total, pedidos, ticket promedio), últimos pedidos | `<a implementar>` |
-| `POST` | `/api/orders/{orderId}/status` con rol `admin` sobre pedidos de terceros | El cambio de estado actual exige ser el dueño del pedido | `<a implementar>` |
+| `GET` | `/api/orders/admin` | Listado **global** de pedidos para la tabla del Admin Pedidos; `GET /api/orders` sigue devolviendo sólo los del usuario actual | ✅ Implementado |
+| `GET` | `/api/orders/admin/summary` | KPIs del Admin Resumen: ventas de hoy (monto + cantidad), pedidos pendientes (incl. sin pago acreditado), serie de 7 días (total, pedidos, ticket promedio), últimos pedidos | ✅ Implementado |
+| `POST` | `/api/orders/{orderId}/status` con rol `admin` sobre pedidos de terceros | El cambio de estado permite al admin actuar sobre cualquier pedido | ✅ Implementado |
+
+> El gateway exige `ROLE_admin` para `/api/orders/admin/**`; el servicio vuelve a verificar `X-User-Roles` para no depender de que la petición haya pasado por el gateway. Los importes y conteos del resumen excluyen pedidos `CANCELLED`; la serie usa días naturales en UTC (ver §4.3).
 
 ---
 
@@ -65,6 +71,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `400` | Bad Request | `TotalMismatchException`: el `total` del request no coincide con el calculado en el servidor | `El total enviado (100.00) no coincide con el total calculado en el servidor (199.98)` |
 | `401` | Unauthorized | Falta `X-User-Id` (la petición no pasó por el gateway) | `Falta o es inválido el header 'X-User-Id'; la petición debe pasar por el Gateway` |
 | `403` | Forbidden | El pedido pertenece a otro usuario | `No tiene permiso sobre el pedido 42` |
+| `403` | Forbidden | Falta el rol `admin` en un endpoint administrativo | `Se requiere el rol 'admin' para esta operación` |
 | `404` | Not Found | Pedido inexistente | `Pedido no encontrado con id 42` |
 | `404` | Not Found | Producto inexistente al crear el pedido (respuesta `404` de `product-service`) | `Producto no encontrado con id 42` |
 | `409` | Conflict | Transición de estado inválida | `No se puede pasar de DELIVERED a PAID` |
@@ -141,7 +148,10 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `POST /{id}/status` | Rechaza `CANCELLED` explícitamente (`Para cancelar un pedido use POST /api/orders/{orderId}/cancel`); valida la transición con la máquina |
 | `POST /{id}/cancel` | Sólo sobre `PENDING` o `PAID` (`cancellable()`); si estaba `PAID` setea `refundRequired=true` y publica además `REFUND_REQUESTED`. Motivo opcional, máx. 500 caracteres |
 | Pago aprobado (asíncrono) | `PaymentApprovedConsumer` escucha `payment-events`; sólo actúa si `type == PAYMENT_APPROVED` y el pedido está en `PENDING` → `PAID` (idempotente: un evento repetido se ignora). **No publica** evento de cambio de estado por esta vía |
-| Propiedad | Todo acceso a un pedido exige `customerId == X-User-Id`; si no → `403` |
+| Propiedad | Todo acceso a un pedido exige `customerId == X-User-Id`; si no → `403`. Excepción: `POST /{id}/status` con rol `admin` (propagado en `X-User-Roles`) permite actuar sobre pedidos de terceros |
+| Consultas admin | `GET /api/orders/admin` y `/admin/summary` exigen rol `admin` en el gateway **y** en el servicio. El listado admite `status`, `from` (inclusive) y `to` (exclusive) sobre `created_at`, paginado con `createdAt DESC` por defecto |
+| Resumen admin | `salesToday`/`ordersToday` y `salesByDay` se calculan de `orders` en UTC, excluyendo `CANCELLED`. `pendingOrders` = `PENDING` + `PAID`; `pendingWithoutPayment` = `PENDING` (sin `PAYMENT_APPROVED`). La serie cubre 7 días naturales y cada día expone `total`, `orders` y `averageTicket` (`total / pedidos`, 2 decimales). `recentOrders` son los 5 pedidos más recientes |
+| Propagación de cupón | `couponCode` del `CreateOrderRequest` (opcional) se copia al `ORDER_CREATED`; si no se envía, el campo sale `null` y los consumidores antiguos siguen funcionando |
 | Concurrencia | `@Version` en `orders`: cambios concurrentes → `409` |
 | Outbox transaccional | Los eventos se agregan a `outbox_events` dentro de la misma transacción; `OutboxRelay` (poll cada `1 s`, batch 50, máx. 10 intentos con re-lectura de `FAILED`) los publica a Kafka con key = `aggregateId` |
 | Métricas | Micrometer: `latiendita.orders.create` (timer), `latiendita.orders.created`, `latiendita.orders.revenue`, `latiendita.orders.status.changed{from,to}`, `latiendita.orders.cancelled{refund}`, `latiendita.orders.refunds.requested` |
@@ -156,6 +166,9 @@ Campos documentados en §2 (requests) y derivados de las entidades de §4.1 (res
 | `UpdateOrderStatusRequest` | `POST /api/orders/{id}/status` | `status` | Ejemplo en §2; `CANCELLED` rechazado acá |
 | `CancelOrderRequest` | `POST /api/orders/{id}/cancel` | `reason?` | Ejemplo en §2; máx. 500 caracteres |
 | `OrderResponse` | `POST /api/orders`, `GET /api/orders[/{id}]`, cambio de estado y cancelación | `id`, `orderNumber`, `customerId`, `status`, `total`, `cancelReason`, `refundRequired`, `createdAt`, `updatedAt`, `items[]` | De `OrderEntity`; `orderNumber` es correlativo numérico (§4.1). `items[]` = `OrderItemEntity`: `productId`, `productTitle`, `sku`, `quantity`, `unitPrice`, `subtotal` |
+| `AdminOrderResponse` | `GET /api/orders/admin`, `recentOrders[]` del resumen | `id`, `orderNumber`, `customerId`, `status`, `total`, `itemCount`, `createdAt` | Fila de la tabla global; `itemCount` = tamaño de `items` (no se expone la instantánea completa) |
+| `AdminSalesDayResponse` | `salesByDay[]` del resumen | `date` (ISO `yyyy-MM-dd`, UTC), `total`, `orders`, `averageTicket` | Serie de 7 días naturales, incluidos los días sin pedidos |
+| `AdminOrderSummaryResponse` | `GET /api/orders/admin/summary` | `salesToday`, `ordersToday`, `pendingOrders`, `pendingWithoutPayment`, `salesByDay[]`, `recentOrders[]` | Ver reglas en §4.3 |
 
 ---
 
@@ -252,10 +265,10 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | **Checkout — pasos** Carrito → Envío → Pago → Confirmación | `POST /api/orders` crea el pedido en `PENDING` al salir del carrito/confirmar envío; el paso **Pago** lo resuelve `payment-service` y el resultado llega por Kafka (`PAYMENT_APPROVED` → `PAID`); la confirmación muestra el pedido con `GET /api/orders/{id}` | ✅ Implementado |
 | **Checkout Shipping — resumen** (subtotal, costo de envío, total, "Impuestos incluidos en los precios") | Subtotal y total salen de `POST /api/orders` / `GET /api/orders/{id}`. **Costo de envío no existe** en el modelo ni en el request (el total es sólo Σ subtotales); "Impuestos incluidos" es copy del frontend | ⚠️ `<a implementar>` (campo y cálculo de envío) |
 | **Checkout Shipping — CTAs** "Continuar al pago" / "Volver al carrito" | Frontend; el paso de pago dispara `payment-service` y el estado del pedido queda visible vía `GET /api/orders/{id}` | ✅ Implementado |
-| **Admin Pedidos — tabla** (Pedido `#1042`, Cliente, Fecha, Estado, Total, Acción) | `orderNumber`, `customerId`, `createdAt`, `status`, `total` existen en `OrderResponse`; `orderNumber` es un correlativo numérico que la UI muestra como `#1042`. **Falta:** endpoint de listado global (`GET /api/orders` sólo devuelve pedidos del usuario actual) | ⚠️ `<a implementar>` (listado global) |
+| **Admin Pedidos — tabla** (Pedido `#1042`, Cliente, Fecha, Estado, Total, Acción) | `GET /api/orders/admin` devuelve `id`, `orderNumber`, `customerId`, `createdAt`, `status`, `total`, `itemCount` con filtros y paginado. El nombre/email del cliente y el método de pago no viven en este servicio: el frontend los resuelve con `customer-service` / `payment-service` | ✅ Implementado (datos propios del pedido) |
 | **Admin Pedidos — estados mostrados** | Mapeo a `OrderStatus` real: `Pendiente` = `PENDING`, `Pagado` = `PAID`, `Enviado` = `SHIPPED`; además el enum tiene `DELIVERED` (Entregado) y `CANCELLED` (Cancelado) que la UI debe mostrar | ✅ Implementado (mapeo de etiquetas) |
-| **Admin Pedidos — acción de cambiar estado** | `POST /api/orders/{id}/status` con la máquina de transiciones | ⚠️ Sólo para pedidos propios; uso admin global `<a implementar>` |
-| **Admin Resumen — KPI "Ventas de hoy"** ($ + cantidad de pedidos del día) | Sin endpoint de agregación; existen métricas Micrometer (`latiendita.orders.revenue`, `latiendita.orders.created`) como fuente posible | ⚠️ `<a implementar>` |
-| **Admin Resumen — KPI "Pedidos pendientes"** ("4 sin pago acreditado") | Conteo de pedidos en `PENDING` (sin `PAYMENT_APPROVED`); sin endpoint de agregación | ⚠️ `<a implementar>` |
-| **Admin Resumen — gráfico "Ventas de los últimos 7 días"** (total, pedidos, ticket promedio) | Serie temporal derivada de `orders.created_at`/`total`; sin endpoint de agregación | ⚠️ `<a implementar>` |
-| **Admin Resumen — tabla "Últimos pedidos"** | Reutiliza el listado global de pedidos (ver fila de Admin Pedidos) | ⚠️ `<a implementar>` |
+| **Admin Pedidos — acción de cambiar estado** | `POST /api/orders/{id}/status` con la máquina de transiciones; el rol `admin` permite operar sobre pedidos de terceros | ✅ Implementado |
+| **Admin Resumen — KPI "Ventas de hoy"** ($ + cantidad de pedidos del día) | `GET /api/orders/admin/summary` → `salesToday` + `ordersToday` (excluye `CANCELLED`) | ✅ Implementado |
+| **Admin Resumen — KPI "Pedidos pendientes"** ("4 sin pago acreditado") | `pendingOrders` (`PENDING` + `PAID`) y `pendingWithoutPayment` (`PENDING`) del resumen | ✅ Implementado |
+| **Admin Resumen — gráfico "Ventas de los últimos 7 días"** (total, pedidos, ticket promedio) | `salesByDay[]` del resumen: 7 días UTC con `total`, `orders` y `averageTicket` | ✅ Implementado |
+| **Admin Resumen — tabla "Últimos pedidos"** | `recentOrders[]` del resumen (5 pedidos más recientes, mismo DTO que la tabla global) | ✅ Implementado |

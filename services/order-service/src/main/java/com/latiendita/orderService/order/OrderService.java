@@ -125,7 +125,9 @@ public class OrderService {
                     "Para cancelar un pedido use POST /api/orders/{orderId}/cancel");
         }
 
-        OrderEntity order = findOwnedEntity(orderId);
+        OrderEntity order = CurrentUser.isAdmin()
+                ? findEntityForAdmin(orderId)
+                : findOwnedEntity(orderId);
         OrderStatus from = order.getStatus();
         if (!from.canTransitionTo(target)) {
             throw new InvalidStateTransitionException(from, target);
@@ -189,6 +191,11 @@ public class OrderService {
             throw new InvalidOrderException(
                     "No puede repetir el mismo productId en los ítems del pedido");
         }
+    }
+
+    private OrderEntity findEntityForAdmin(Long orderId) {
+        return orderRepository.findWithItemsById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
     }
 
     private OrderEntity findOwnedEntity(Long orderId) {
