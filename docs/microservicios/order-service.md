@@ -26,7 +26,7 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://orderService:
 
 ```jsonc
 // POST /api/orders — CreateOrderRequest
-{ "items": [ { "productId": 1, "quantity": 2 } ], "total": 199.98 }   // total opcional
+{ "items": [ { "productId": 1, "quantity": 2 } ], "total": 199.98, "couponCode": "BIENVENIDO10" }   // total y couponCode opcionales
 
 // POST /api/orders/{id}/status — UpdateOrderStatusRequest
 { "status": "PAID" }
@@ -152,7 +152,7 @@ Campos documentados en §2 (requests) y derivados de las entidades de §4.1 (res
 
 | DTO | Uso | Campos | Origen / nota |
 |---|---|---|---|
-| `CreateOrderRequest` | `POST /api/orders` | `items[]` con `productId`, `quantity` + `total?` | Ejemplo en §2:27-36; `total` es opcional y se re-valida contra el servidor (`TotalMismatchException`) |
+| `CreateOrderRequest` | `POST /api/orders` | `items[]` con `productId`, `quantity` + `total?` + `couponCode?` | Ejemplo en §2:27-36; `total` es opcional y se re-valida contra el servidor (`TotalMismatchException`); `couponCode` es opcional y se propaga en `ORDER_CREATED` (retrocompatible: ausente ⇒ `null`) |
 | `UpdateOrderStatusRequest` | `POST /api/orders/{id}/status` | `status` | Ejemplo en §2; `CANCELLED` rechazado acá |
 | `CancelOrderRequest` | `POST /api/orders/{id}/cancel` | `reason?` | Ejemplo en §2; máx. 500 caracteres |
 | `OrderResponse` | `POST /api/orders`, `GET /api/orders[/{id}]`, cambio de estado y cancelación | `id`, `orderNumber`, `customerId`, `status`, `total`, `cancelReason`, `refundRequired`, `createdAt`, `updatedAt`, `items[]` | De `OrderEntity`; `orderNumber` es correlativo numérico (§4.1). `items[]` = `OrderItemEntity`: `productId`, `productTitle`, `sku`, `quantity`, `unitPrice`, `subtotal` |
@@ -231,7 +231,7 @@ Campos documentados en §2 (requests) y derivados de las entidades de §4.1 (res
 
 | Evento | Dirección | Trigger | Payload |
 |---|---|---|---|
-| `ORDER_CREATED` | Publica (topic `order-events`, vía outbox) | `POST /api/orders` exitoso | `{ orderId, orderNumber, customerId, total, items: [{ productId, quantity, unitPrice, subtotal }], occurredAt }` |
+| `ORDER_CREATED` | Publica (topic `order-events`, vía outbox) | `POST /api/orders` exitoso | `{ orderId, orderNumber, customerId, total, couponCode, items: [{ productId, quantity, unitPrice, subtotal }], occurredAt }` — `couponCode` es `null` si el request no lo envió; `offer-service` lo usa para registrar el uso del cupón |
 | `ORDER_STATUS_CHANGED` | Publica (topic `order-events`, vía outbox) | `POST /api/orders/{id}/status` con transición válida | `{ orderId, orderNumber, customerId, from, to, occurredAt }` |
 | `ORDER_CANCELLED` | Publica (topic `order-events`, vía outbox) | `POST /api/orders/{id}/cancel` sobre `PENDING` o `PAID` | `{ orderId, orderNumber, customerId, reason, refundRequired, occurredAt }` |
 | `REFUND_REQUESTED` | Publica (topic `order-events`, vía outbox) | Cancelación de un pedido que estaba `PAID` (sólo si `refundRequired`) | `{ orderId, orderNumber, customerId, amount, occurredAt }` |

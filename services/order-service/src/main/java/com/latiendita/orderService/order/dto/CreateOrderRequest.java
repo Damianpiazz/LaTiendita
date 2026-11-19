@@ -9,5 +9,11 @@ import java.util.List;
 
 public record CreateOrderRequest(
         @NotEmpty List<@Valid ItemRequest> items,
-        @PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal total
-) {}
+        @PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal total,
+        String couponCode
+) {
+    /** Retrocompatible with clients that do not send a coupon. */
+    public CreateOrderRequest(List<@Valid ItemRequest> items, BigDecimal total) {
+        this(items, total, null);
+    }
+}

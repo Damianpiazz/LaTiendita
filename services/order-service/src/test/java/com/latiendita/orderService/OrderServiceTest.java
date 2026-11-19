@@ -111,6 +111,36 @@ class OrderServiceTest {
     }
 
     @Test
+    void shouldPropagateCouponCodeInOrderCreatedEvent() {
+        when(productClient.findById(42L)).thenReturn(product(42L, "NB-LEN-001", "999.99"));
+        when(orderRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity order = invocation.getArgument(0);
+            order.setId(1L);
+            return order;
+        });
+
+        CreateOrderRequest request = new CreateOrderRequest(
+                List.of(new ItemRequest(42L, 1)), null, "BIENVENIDO10");
+
+        orderService.create(request);
+
+        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+        verify(outboxWriter).append(eq(OrderService.ORDER_EVENTS_TOPIC), eq(1L),
+                eq("ORDER_CREATED"), payload.capture());
+        assertThat(payload.getValue()).isInstanceOf(OrderCreatedEvent.class);
+        assertThat(((OrderCreatedEvent) payload.getValue()).couponCode())
+                .isEqualTo("BIENVENIDO10");
+    }
+
+    @Test
+    void shouldKeepLegacyCreateRequestWithoutCouponCode() {
+        CreateOrderRequest request = new CreateOrderRequest(
+                List.of(new ItemRequest(42L, 1)), new BigDecimal("999.99"));
+
+        assertThat(request.couponCode()).isNull();
+    }
+
+    @Test
     void shouldRejectClientTotalThatDoesNotMatchCalculated() {
         when(productClient.findById(42L)).thenReturn(product(42L, "NB-LEN-001", "999.99"));
 

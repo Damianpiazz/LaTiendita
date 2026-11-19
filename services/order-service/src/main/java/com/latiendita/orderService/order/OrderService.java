@@ -102,8 +102,8 @@ public class OrderService {
 
         outboxWriter.append(ORDER_EVENTS_TOPIC, saved.getId(), "ORDER_CREATED",
                 new OrderCreatedEvent(saved.getId(), saved.getOrderNumber(),
-                        saved.getCustomerId(), saved.getTotal(), itemsAsEvent(saved),
-                        Instant.now()));
+                        saved.getCustomerId(), saved.getTotal(), request.couponCode(),
+                        itemsAsEvent(saved), Instant.now()));
 
         return OrderMapper.toResponse(saved);
     }

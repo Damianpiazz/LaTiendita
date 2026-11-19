@@ -9,6 +9,7 @@ public record OrderCreatedEvent(
         String orderNumber,
         String customerId,
         BigDecimal total,
+        String couponCode,
         List<Item> items,
         Instant occurredAt
 ) {
