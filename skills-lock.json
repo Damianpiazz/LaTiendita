@@ -1,59 +1,101 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "documentation": {
       "source": "anthropics/knowledge-work-plugins",
       "sourceType": "github",
       "skillPath": "engineering/skills/documentation/SKILL.md",
-      "computedHash": "43947d80ab634432362a076657eb225212760adbe731c0829a92709aeb842666"
+      "computedHash": "d401429502dcfb37aadfbeddcc3577a9618c393555d305c56821800570dcd1ed"
     },
     "floci": {
       "source": "floci-io/floci-cli",
       "sourceType": "github",
       "skillPath": "skills/floci/SKILL.md",
-      "computedHash": "3f511ded96cb856a2fe98265f187bd7714c52dce69940948854f55a2019b2f0d"
+      "computedHash": "6a30fa0268ee84936c009c966dfbf8e4371735755058a8370eca436b6e4bf67d"
     },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/frontend-design/SKILL.md",
-      "computedHash": "106acf230014cbb43ca34e6410371321b56ca742f9ee0442e8ec05bf02eb0384"
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c"
     },
     "java-springboot": {
       "source": "github/awesome-copilot",
       "sourceType": "github",
       "skillPath": "skills/java-springboot/SKILL.md",
-      "computedHash": "108cb49f1d7950889b6223e5810266f1ff38bf62a0d52d932f6edc607a0ddfbf"
+      "computedHash": ""
+    },
+    "mermaid-diagrams": {
+      "source": "softaworks/agent-toolkit",
+      "commit": "3027f20f3181758385a1bb8c022d4041dfb4de84",
+      "sourceType": "github",
+      "skillPath": "skills/mermaid-diagrams/SKILL.md",
+      "computedHash": "c425d7bc17756e5c0538e57286a008b18a45d0967401695c003692badf0cb37a"
+    },
+    "modern-javascript-patterns": {
+      "source": "wshobson/agents",
+      "commit": "42203085cfc5736204bf0f6d436dff7e1da0bf3f",
+      "sourceType": "github",
+      "skillPath": "plugins/javascript-typescript/skills/modern-javascript-patterns/SKILL.md",
+      "computedHash": "9b0a9226c7006b041f30969d055e1ed9ef8267cc1cf59819552503ff477cae36"
     },
     "multi-stage-dockerfile": {
       "source": "github/awesome-copilot",
       "sourceType": "github",
       "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
-      "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
+      "computedHash": ""
     },
     "open-pencil": {
       "source": "open-pencil/open-pencil",
       "sourceType": "github",
       "skillPath": "skills/open-pencil/SKILL.md",
-      "computedHash": "7b816495b96758b35f0dd22e213d8925467089983845de2e57cd3f2a7f0d8d0f"
+      "computedHash": "cd15a40bfd7b8713a6e218db08159dde9b2509a5943739fb6c1a3e9896424df6"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "commit": "968d8cb9dc42ae5d52e8fd356cf84596ec832a26",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
     },
     "springboot-security": {
       "source": "affaan-m/ecc",
       "sourceType": "github",
       "skillPath": "skills/springboot-security/SKILL.md",
-      "computedHash": "c518a86c3a473e0545c35065d82284d13a5d99d6f7a0e17780594f3a44af38ad"
+      "computedHash": ""
     },
     "terraform-style-guide": {
       "source": "hashicorp/agent-skills",
       "sourceType": "github",
       "skillPath": "plugins/terraform/skills/terraform-style-guide/SKILL.md",
-      "computedHash": "b47790ecc50d56cba8970b8d9814e96d624cdd64a22a38118d11a554836cd768"
+      "computedHash": "39a686ad7d71d99e5fbead0a5cbd666c096af8d38d152f7597eb314e5b2b622c"
     },
     "terraform-test": {
       "source": "hashicorp/agent-skills",
       "sourceType": "github",
       "skillPath": "plugins/terraform/skills/terraform-test/SKILL.md",
-      "computedHash": "c9e257250e14ea71e522e131a4a63a65434360fe3a0635c8bf8a49ca5529e2cd"
+      "computedHash": "8c66c1856320d5b74eb54b89f9c2553ff7e5733bfc08135edd922830287d0c0f"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "f984fcd3dec8c71cf88f2b47ff8acd0ff4ca99c2",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "360159cc275aac0ad40ba97927224bdd5e44f703666b42cd956af16caf1a1fea"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "7991ed4fbecdac23f47c1a40c243e00a212a9e7f3604db93959b3ae11dffe299"
+    },
+    "vitest": {
+      "source": "antfu/skills",
+      "commit": "4a6bb39e7b45e26402eb215393c51ccf5df1ca4c",
+      "sourceType": "github",
+      "skillPath": "skills/vitest/SKILL.md",
+      "computedHash": "bd95e41d66d76da9008893c9bc48c30f0a68f352cd2b00017767f5e4c129501d"
     }
   }
 }
