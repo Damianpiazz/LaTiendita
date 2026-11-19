@@ -38,7 +38,7 @@ Notas de identidad y trazabilidad:
 
 Flujo del checkout (paso "Envío"):
 
-1. El frontend llama a `POST /api/shipments/quote` con el subtotal; el servicio responde costo (`0` o `2.499`), `freeShipping` y la ventana estimada (3–5 días hábiles) que se muestra en "Llega en 3–5 días hábiles a tu puerta".
+1. El frontend llama a `POST /api/shipments/quote`; el servicio responde el costo fijo (`2.499`) y la ventana estimada (3–5 días hábiles) que se muestra en "Llega en 3–5 días hábiles a tu puerta".
 2. El cliente completa el formulario de dirección; si marca la casilla, se persiste con `POST /api/shipments/addresses`.
 3. Al "Continuar al pago", `POST /api/shipments` registra el envío del pedido con la dirección elegida (snapshot), el costo cotizado y la ventana estimada, en estado `AWAITING_PAYMENT`.
 4. Cuando el pago se aprueba (`PAYMENT_APPROVED` desde `payment-service`), el envío pasa a `PENDING_DISPATCH` (alimenta el KPI "pendientes de despacho").
@@ -86,7 +86,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `order_id` | `bigint` | ❌ | ❌ | ✅ | Pedido asociado; un solo envío por pedido |
 | `customer_id` | `varchar(36)` | ❌ | ❌ | ❌ | Cliente dueño (`sub` del JWT) |
 | `status` | `varchar(20)` | ❌ | ❌ | ❌ | `AWAITING_PAYMENT`, `PENDING_DISPATCH`, `DISPATCHED`, `DELIVERED`, `CANCELLED` |
-| `shipping_cost` | `numeric(12,2)` | ❌ | ❌ | ❌ | Costo cotizado (`0` si es gratis) |
+| `shipping_cost` | `numeric(12,2)` | ❌ | ❌ | ❌ | Costo cotizado (tarifa plana) |
 | `currency` | `char(3)` | ❌ | ❌ | ❌ | Moneda (`ARS`) |
 | `recipient_name` | `varchar(120)` | ❌ | ❌ | ❌ | Snapshot del destinatario |
 | `phone` | `varchar(30)` | ❌ | ❌ | ❌ | Snapshot del teléfono |
@@ -127,13 +127,13 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `Shipment` N → 1 `Order` | Muchos-a-uno | `order_id`; el pedido reside en `order-service` (sin FK) |
 | `Shipment` N → 1 `DeliveryAddress` | Muchos-a-uno | Referencia al momento de crear; luego el envío conserva su propio snapshot (sin FK) |
 | `Shipment` N → 1 `Customer` | Muchos-a-uno | `customer_id`; reside en `customer-service` (sin FK) |
-| `DeliveryAddress` N → 1 `Customer` | Muchos-a-uno | `customer_id`; direcciones del libro del cliente |
+| `DeliveryAddress` N → 1 `Customer` | Muchos-a-uno | `customer_id`; direcciones guardadas en `delivery_addresses` |
 
 ### 4.3 Reglas de negocio
 
 | Regla | Detalle |
 |---|---|
-| Costo de envío | `shippingCost = 0` si `subtotal >= 50.000` (`SHIPMENT_FREE_SHIPPING_THRESHOLD`); caso contrario `2.499` (`SHIPMENT_FLAT_RATE`). Moneda `ARS` |
+| Costo de envío | Tarifa plana: `shippingCost = 2.499` (`SHIPMENT_FLAT_RATE`), sin modalidad de envío gratis. Moneda `ARS` |
 | Fecha estimada | Ventana de 3 a 5 días hábiles desde el registro (sábados y domingos excluidos; feriados nacionales **no** contemplados — limitación conocida) |
 | Unicidad | Un solo envío por pedido (`order_id` unique) |
 | Snapshot de dirección | La dirección se copia al envío al registrarlo; editar o borrar la dirección guardada no altera envíos existentes |
@@ -143,6 +143,19 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Sin pago aprobado | Si `PAYMENT_APPROVED` llega sin envío registrado, se crea con la dirección por defecto del cliente; si no hay ninguna, queda `PENDING_DISPATCH` sin dirección para resolución manual |
 | Borrado | Físico; las direcciones del cliente también (sin borrado lógico) |
 | Concurrencia | `version` (optimistic locking) → `409` ante escrituras simultáneas |
+
+### 4.4 DTOs (contratos de API)
+
+> **Propuesto; aún no implementado.** Servicio *scaffold*: los campos se derivan de las entidades de §4.1 y de lo que exige el wireframe (§7). Tarifa plana: sin `freeShipping` en ningún DTO.
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `QuoteRequest` | `POST /api/shipments/quote` | `subtotal` | Explícito en §2. Hoy es informativo: no altera el costo (tarifa plana de `2.499`) |
+| `QuoteResponse` | `POST /api/shipments/quote` | `shippingCost`, `currency`, `estimatedFrom`, `estimatedTo` | Alimenta la fila "Envío a domicilio" y la ventana de 3–5 días (§7) |
+| `AddressResponse` | `GET`/`POST`/`PUT /api/shipments/addresses` | `id`, `recipientName`, `phone`, `addressLine`, `city`, `province`, `postalCode`, `references`, `isDefault` | De `DeliveryAddress` (`delivery_addresses` es la fuente única); `id` se omite en el request |
+| `CreateAddressRequest` / `UpdateAddressRequest` | `POST`/`PUT /api/shipments/addresses` | `recipientName`, `phone`, `addressLine`, `city`, `province`, `postalCode`, `references`, `isDefault` | Igual proyección que `AddressResponse`, sin `id`. Corresponde al formulario del checkout (§7) |
+| `CreateShipmentRequest` | `POST /api/shipments` | `orderId`, `addressId?`, `address?`, `shippingCost`, `currency`, `estimatedFrom`, `estimatedTo` | Explícito en §2; `address` se usa cuando no hay `addressId` guardada |
+| `ShipmentResponse` | `POST /api/shipments`, `GET /api/shipments[/{id}\|/order/{orderId}]`, `POST /{id}/dispatch` | `id`, `orderId`, `status`, `shippingCost`, `currency`, `recipientName`, `phone`, `addressLine`, `city`, `province`, `postalCode`, `references`, `estimatedFrom`, `estimatedTo`, `dispatchedAt`, `deliveredAt` | De `Shipment`; conserva el snapshot de dirección. Se omite `version` (auditoría interna) |
 
 ---
 
@@ -160,7 +173,6 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `SPRING_DATASOURCE_PASSWORD` | Password de la base de datos | ✅ | — | *(secret)* |
 | `KAFKA_BOOTSTRAP_SERVERS` | Brokers de Kafka (outbox + listeners) | ❌ | `localhost:9092` | `kafka:9092` |
 | `ORDER_SERVICE_BASE_URL` | URL base de `order-service` | ❌ | `http://localhost:8080` | `http://orderService:8080` |
-| `SHIPMENT_FREE_SHIPPING_THRESHOLD` | Umbral de subtotal para envío gratis | ❌ | `50000` | `50000` |
 | `SHIPMENT_FLAT_RATE` | Costo fijo de envío | ❌ | `2499` | `2499` |
 | `SHIPMENT_ETA_MIN_BUSINESS_DAYS` | Mínimo de días hábiles de entrega | ❌ | `3` | `3` |
 | `SHIPMENT_ETA_MAX_BUSINESS_DAYS` | Máximo de días hábiles de entrega | ❌ | `5` | `5` |
@@ -199,7 +211,7 @@ Nota: no requiere `JWT_SECRET`; la validación del token la hace el gateway (pat
 |---|---|---|---|---|
 | `order-service` | Validar que el pedido existe y está `PENDING` al registrar el envío (`OrderClient`, patrón de `payment-service`) | HTTP/REST (`ORDER_SERVICE_BASE_URL`) | Retry + circuit breaker Resilience4j → `503` | ✅ Sí |
 
-**Decisión sobre las direcciones:** las direcciones de entrega se guardan en **este servicio** (`delivery_addresses`), no en `customer-service`. Justificación: (1) `customer-service` es hoy un scaffold sin API, y bloquear el paso "Envío" del checkout detrás de un servicio no implementado no es aceptable; (2) la dirección de entrega es un dato logístico —de él dependen el costo, la ventana estimada y el despacho—; (3) el envío de todos modos debe persistir su propio snapshot para no reescribir el historial cuando la dirección cambie o se borre. Cuando `customer-service` madure como fuente de verdad del perfil, el libro de direcciones puede consolidarse allí copiando solo el snapshot al crear el envío (migración sin cambio de contrato para el frontend).
+**Decisión sobre las direcciones (definitiva):** `delivery_addresses` de **este servicio** es la única fuente de verdad de las direcciones de entrega; `customer-service` no almacena ni expone direcciones. Justificación: (1) la dirección de entrega es un dato logístico —de él dependen el costo, la ventana estimada y el despacho—; (2) `customer-service` es hoy un scaffold sin API, y bloquear el paso "Envío" del checkout detrás de un servicio no implementado no es aceptable; (3) el envío de todos modos debe persistir su propio snapshot para no reescribir el historial cuando la dirección cambie o se borre.
 
 ### 6.2 Dependencias externas
 
@@ -226,7 +238,7 @@ Publicados en `shipment-events` con key `orderId`, mediante outbox transaccional
 
 | Pantalla del wireframe | Endpoints / responsabilidades del servicio |
 |---|---|
-| **Checkout "Envío"** (Checkout Shipping Wireframe) — método "Envío a domicilio", descripción "Llega en 3–5 días hábiles a tu puerta", precio "$ 2.499" y nota "Gratis desde $ 50.000" | `POST /api/shipments/quote` aplica la regla (gratis desde $ 50.000, si no $ 2.499) y devuelve la ventana de 3–5 días hábiles que alimenta la descripción y la fila "Envío a domicilio" del resumen |
+| **Checkout "Envío"** (Checkout Shipping Wireframe) — método "Envío a domicilio", descripción "Llega en 3–5 días hábiles a tu puerta" y precio "$ 2.499" | `POST /api/shipments/quote` devuelve el costo de tarifa plana (`2.499`) y la ventana de 3–5 días hábiles que alimenta la descripción y la fila "Envío a domicilio" del resumen |
 | **Checkout "Envío"** — formulario de dirección (nombre y apellido, teléfono, dirección, ciudad, provincia, código postal, referencias) y checkbox "Guardar esta dirección para futuras compras" | `POST /api/shipments/addresses` (con el checkbox marcado), `GET`/`PUT`/`DELETE /api/shipments/addresses` para reutilizar direcciones en compras futuras; `POST /api/shipments` registra el envío con la dirección elegida al continuar al pago |
 | **Checkout "Envío"** — resumen con fila "Envío a domicilio" y total | `QuoteResponse.shippingCost` se muestra en la fila; el total es responsabilidad del frontend/`order-service` (ver nota de integración abajo) |
 | **Admin Pedidos** — estado `Enviado` del pedido y acción de despacho | `POST /api/shipments/{id}/dispatch` marca el envío `DISPATCHED` y publica `SHIPMENT_DISPATCHED`; consumidor propuesto en `order-service` pasa el pedido `PAID` → `SHIPPED` (`Enviado`) |

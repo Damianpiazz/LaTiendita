@@ -102,6 +102,16 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Carrito anónimo | No soportado (justificado): la identidad llega únicamente en `X-User-Id` vía gateway y el checkout exige sesión; un carrito anónimo requeriría IDs generados en el cliente y fusionar al iniciar sesión, sin ganancia actual |
 | Checkout | Al crear el pedido con éxito, el flujo de checkout vacía el carrito (`DELETE /api/carts`) |
 
+### 4.4 DTOs (contratos de API)
+
+> **Propuesto; aún no implementado.** Servicio *scaffold*: los campos se derivan de las entidades de §4.1 y de lo que exige el wireframe (§7).
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `CartDto` | `GET /api/carts` (y respuesta de `POST`/`PATCH`) | `id`, `items[]`, `subtotal`, `itemCount`, `total` | `subtotal`, `itemCount` y `total` son computados (§7:178, §7:180). `items[]` = proyección de `CartItem`: `productId`, `productTitle`, `imageUrl`, `quantity`, `unitPrice`, `lineSubtotal`, `priceChanged` |
+| `AddCartItemRequest` | `POST /api/carts/items` | `productId`, `quantity` | El precio y el título se toman de `product-service`, nunca del cliente |
+| `UpdateCartItemRequest` | `PATCH /api/carts/items/{productId}` | `quantity` | El `productId` va en la ruta; rango `1..stock` |
+
 ---
 
 ## 5. Configuración

@@ -132,6 +132,15 @@ Detalle de los `409`: `DuplicatePaymentException` (pedido ya `PAID`), `InvalidSt
 | Concurrencia | `version` (optimistic locking) → `409` ante escrituras simultáneas |
 | Invariantes | `created_at <= updated_at`; `paid_at` solo cuando `status = APPROVED` |
 
+### 4.4 DTOs (contratos de API)
+
+Campos derivados de la entidad de §4.1 y de lo que consumen las pantallas de §7. Se omiten `idempotencyKey` y `version` (detalles internos).
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `CreatePaymentRequest` | `POST /api/payments` | `orderId` | El monto no se acepta del cliente: se toma de `order.total` |
+| `PaymentResponse` | `POST /api/payments`, `GET /api/payments[/{id}\|/order/{orderId}\|/reference/{externalReference}]` | `id`, `orderId`, `customerId`, `provider`, `status`, `amount`, `currency`, `preferenceId`, `checkoutUrl`, `externalReference`, `providerPaymentId`, `paymentMethodId`, `paymentType`, `statusDetail`, `paidAt`, `expiresAt`, `createdAt`, `updatedAt` | `checkoutUrl` alimenta el paso "Pago" (§7); `status`, `amount` y `paidAt` alimentan Admin Pagos (§7:220) |
+
 ---
 
 ## 5. Configuración

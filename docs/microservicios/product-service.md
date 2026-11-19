@@ -120,6 +120,15 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Imágenes | `image_url` guarda la CLAVE del blob (no la URL absoluta), de modo que el storage pueda cambiarse sin migrar el dato; el `GET .../image` resuelve clave → bytes |
 | Seed | `CatalogSeedRunner` (`app.seed.enabled=true`) carga `seed/categories.json`, `seed/products.json` y sube `seed/images/<SKU>.*` (jpg/jpeg/png/webp/gif) al storage con clave `productos/<SKU>.<ext>`, idempotente: existentes se omiten y las imágenes se re-subben con `overwrite=true`. Best-effort: un storage caído no detiene el arranque |
 
+### 4.4 DTOs (contratos de API)
+
+Campos derivados de las entidades de §4.1 y de lo que consumen las pantallas de §7. Se omite `version` (auditoría interna).
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `ProductDto` | `GET /api/products`, `GET /api/products/{id}`, body de `POST`/`PUT /api/products` | `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId` | Proyección directa de `ProductEntity`. No incluye `description` ni galería de imágenes: no existen en el modelo (§7) |
+| `CategoryDto` | `GET /api/categories[/{id}]`, body de `POST`/`PUT /api/categories` | `id`, `name`, `description` | Proyección directa de `CategoryEntity` |
+
 ---
 
 ## 5. Configuración

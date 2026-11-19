@@ -8,7 +8,7 @@ Define y publica las **promociones y beneficios** de la plataforma: descuentos p
 **Límites:**
 
 - **No aplica descuentos ni calcula precios**: `product-service` muestra el precio base y `order-service` calcula el total del pedido. Este servicio solo decide *qué* promoción aplica y con qué descuento.
-- **No calcula ni cobra envío**: el cálculo de costos de envío (zona, peso, transportista) y su aplicación al pedido pertenecen a `shipment-service`. **Regla propuesta:** el umbral «Gratis desde $ 50.000» se define aquí como una promoción de tipo `FREE_SHIPPING` —es una decisión de marketing que cambia con cada campaña— y `shipment-service` la consume al calcular el costo. Justificación: si esa regla viviera dentro de `shipment-service`, cada campaña de marketing obligaría a modificar el código de cálculo de envíos, acoplando marketing a logística.
+- **No calcula ni cobra envío**: el cálculo de costos de envío (zona, peso, transportista) y su aplicación al pedido pertenecen a `shipment-service`. No hay modalidad de envío gratis: no existen promociones `FREE_SHIPPING` ni umbrales de subtotal para bonificar el envío.
 - **Credenciales y usuarios**: Authorizer. **Pedidos**: `order-service`. **Productos y categorías**: `product-service`. **Reseñas**: `review-service`.
 
 ---
@@ -74,12 +74,12 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `id` | `UUID` | ✅ | ❌ | ✅ | Identificador único |
 | `code` | `varchar(50)` | ❌ | ✅ | ✅ | Código del cupón; nulo en promociones automáticas (sin canje) |
 | `name` | `varchar(120)` | ❌ | ❌ | ❌ | Nombre visible de la promoción |
-| `type` | `varchar(30)` | ❌ | ❌ | ❌ | `PERCENTAGE`, `FIXED_AMOUNT`, `FREE_SHIPPING`, `FEATURED` |
+| `type` | `varchar(30)` | ❌ | ❌ | ❌ | `PERCENTAGE`, `FIXED_AMOUNT`, `FEATURED` |
 | `scope` | `varchar(20)` | ❌ | ❌ | ❌ | `PRODUCT`, `CATEGORY`, `ORDER` |
-| `product_id` | `varchar(36)` | ❌ | ✅ | ❌ | Referencia al producto en `product-service` (sin FK cross-service) |
-| `category_id` | `varchar(36)` | ❌ | ✅ | ❌ | Referencia a la categoría en `product-service` (sin FK cross-service) |
+| `product_id` | `bigint` | ❌ | ✅ | ❌ | Referencia al producto en `product-service` (sin FK cross-service) |
+| `category_id` | `bigint` | ❌ | ✅ | ❌ | Referencia a la categoría en `product-service` (sin FK cross-service) |
 | `discount_value` | `numeric(12,2)` | ❌ | ✅ | ❌ | Porcentaje o monto fijo según `type` |
-| `min_subtotal` | `numeric(12,2)` | ❌ | ✅ | ❌ | Subtotal mínimo para que aplique (umbral de envío gratis: `50000`) |
+| `min_subtotal` | `numeric(12,2)` | ❌ | ✅ | ❌ | Subtotal mínimo para que aplique la promoción |
 | `starts_at` | `timestamptz` | ❌ | ❌ | ❌ | Inicio de vigencia |
 | `ends_at` | `timestamptz` | ❌ | ✅ | ❌ | Fin de vigencia; nulo = sin fecha de fin |
 | `priority` | `int` | ❌ | ❌ | ❌ | Prioridad de aplicación (gana la mayor) |
@@ -93,7 +93,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Campo | Tipo | PK | Nullable | Unique | Descripción |
 |---|---|---|---|---|---|
 | `id` | `UUID` | ✅ | ❌ | ✅ | Identificador único |
-| `code` | `varchar(50)` | ❌ | ❌ | ✅ | Identificador estable (`FREE_SHIPPING`, `SECURE_PAYMENTS`, `RETURNS`, `SUPPORT`) |
+| `code` | `varchar(50)` | ❌ | ❌ | ✅ | Identificador estable (`SECURE_PAYMENTS`, `RETURNS`, `SUPPORT`) |
 | `title` | `varchar(120)` | ❌ | ❌ | ❌ | Título de la tarjeta |
 | `description` | `varchar(255)` | ❌ | ❌ | ❌ | Texto de la tarjeta |
 | `icon` | `varchar(50)` | ❌ | ❌ | ❌ | Icono del design system |
@@ -109,7 +109,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `id` | `UUID` | ✅ | ❌ | ✅ | Identificador único |
 | `promotion_id` | `UUID` | ❌ | ❌ | ❌ | FK → `promotions.id` |
 | `customer_sub` | `varchar(255)` | ❌ | ❌ | ❌ | Claim `sub` del cliente que canjea (sin FK) |
-| `order_id` | `varchar(36)` | ❌ | ❌ | ✅ (con `promotion_id`) | Pedido en `order-service` que consume el cupón |
+| `order_id` | `bigint` | ❌ | ❌ | ✅ (con `promotion_id`) | Pedido en `order-service` que consume el cupón |
 | `used_at` | `timestamptz` | ❌ | ❌ | ❌ | Fecha de uso (auditoría) |
 
 ### 4.2 Relaciones
@@ -127,11 +127,23 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Vigencia | Aplica si `starts_at <= now` y (`ends_at` nulo o `now < ends_at`); fuera de vigencia no se evalúa |
 | Prioridad | Ante varias promociones aplicables al mismo target gana la de mayor `priority`; luego la de inicio más reciente |
 | Unicidad | `code` no puede repetirse; cada cupón se usa una sola vez por pedido (`UNIQUE (promotion_id, order_id)`) |
-| Envío gratis | Aplica solo si hay una promoción `FREE_SHIPPING` vigente y el subtotal alcanza `min_subtotal` (`50000` en el wireframe) |
 | Descuentos | El descuento nunca deja el subtotal en negativo; las promociones no `stackable` se excluyen entre sí |
 | Borrado | Las promociones ya usadas no se borran: se desactivan (`active = false`) para conservar la auditoría |
 | Beneficios | Las tarjetas de `benefits` se cargan por seed/migración y se editan solo desde el panel admin |
 | Invariantes | `created_at <= updated_at`; `starts_at < ends_at` cuando `ends_at` tiene valor |
+
+### 4.4 DTOs (contratos de API)
+
+> **Propuesto; aún no implementado.** Servicio *scaffold*: los campos se derivan de las entidades de §4.1 y de lo que exige el wireframe (§7). Sin `FREE_SHIPPING` en ningún DTO.
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `BenefitDto` | `GET /api/benefits` | `id`, `code`, `title`, `description`, `icon`, `sortOrder` | De `Benefit`; alimenta las tarjetas de Home y pies de página. `code` ∈ `SECURE_PAYMENTS`, `RETURNS`, `SUPPORT` |
+| `PromotionDto` | `GET /api/promotions/active`, `GET`/`POST`/`PUT /api/admin/promotions` | `id`, `code`, `name`, `type`, `scope`, `productId`, `categoryId`, `discountValue`, `minSubtotal`, `startsAt`, `endsAt`, `priority`, `stackable`, `active` | De `Promotion`; `type` ∈ `PERCENTAGE`, `FIXED_AMOUNT`, `FEATURED`; `productId`/`categoryId` numéricos |
+| `EvaluationDto` | `POST /api/promotions/evaluate` | `promotionId`, `type`, `discountValue`, `appliedAmount` + `eligible[]` con `targetId`, `discountValue` | Computado: resultado de la evaluación que consumen `product-service` y `order-service` (§1) |
+| `EvaluateRequest` | `POST /api/promotions/evaluate` | `items[]` con `productId`, `categoryId`, `quantity`, `unitPrice` + `subtotal` | Propuesto: espejo de lo que `order-service` envía al crear el pedido |
+| `CouponDto` | `GET /api/coupons/{code}` | `code`, `promotionId`, `valid`, `discountValue`, `minSubtotal`, `startsAt`, `endsAt`, `usageCount` | Valida existencia, vigencia y usos (§2) |
+| `CreatePromotionRequest` / `UpdatePromotionRequest` | `POST`/`PUT /api/admin/promotions` | Campos editables de `Promotion` (sin `id` ni auditoría) | Propuesto, acorde a las reglas de §4.3 |
 
 ---
 
@@ -207,9 +219,8 @@ Fuente: `docs/OpenPencil/LaTiendita.fig`, página "WireFrame".
 
 | Pantalla del wireframe | Endpoints / responsabilidades del servicio |
 |---|---|
-| `Home` — sección "Benefits" (4 tarjetas) | Catálogo de beneficios: `GET /api/benefits` (envío gratis, pagos seguros, devoluciones, soporte) |
+| `Home` — sección "Benefits" | Catálogo de beneficios: `GET /api/benefits` (pagos seguros, devoluciones, soporte) |
 | Pie de `Product Detail`, `Cart`, `Checkout` y `Listings` | Reutiliza el mismo catálogo: `GET /api/benefits` |
-| `Checkout → Shipping` — nota «Gratis desde $ 50.000» | Promoción `FREE_SHIPPING` con `min_subtotal = 50000`: `GET /api/promotions/active` y `POST /api/promotions/evaluate`. El cobro de envío lo aplica `shipment-service` |
 | `Home` / `Listings` — precios promocionados y sección "Featured" | Promociones `PERCENTAGE`, `FIXED_AMOUNT` y `FEATURED` vigentes: `GET /api/promotions/active`, `POST /api/promotions/evaluate` |
 | `Admin` — pantalla de ofertas | **Pantalla nueva**: no existe en el diseño actual. Si se propone, incluiría `GET`/`POST`/`PUT`/`DELETE /api/admin/promotions` (§2) |
 | `Admin` — Resumen, Productos, Categorías, Pedidos, Pagos, Clientes | Sin cobertura propuesta: el panel de ofertas no está en el wireframe y las demás pantallas no dependen de este servicio |

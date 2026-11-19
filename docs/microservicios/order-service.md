@@ -84,7 +84,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Campo | Tipo | PK | Nullable | Unique | Descripción |
 |---|---|---|---|---|---|
 | `id` | `bigserial` | ✅ | ❌ | ✅ | Identificador numérico interno |
-| `order_number` | `varchar(36)` | ❌ | ❌ | ✅ | Número visible del pedido (UUID string generado en la creación) |
+| `order_number` | `bigint` | ❌ | ❌ | ✅ | Correlativo numérico visible del pedido, asignado en la creación (p. ej. `1042`) |
 | `customer_id` | `varchar(36)` | ❌ | ❌ | ❌ | `sub` del token (header `X-User-Id`); sin FK a usuarios |
 | `status` | `varchar(20)` | ❌ | ❌ | ❌ | Enum `OrderStatus`: `PENDING`, `PAID`, `SHIPPED`, `DELIVERED`, `CANCELLED` |
 | `total` | `numeric(12,2)` | ❌ | ❌ | ❌ | Total calculado en el servidor (suma de subtotales) |
@@ -136,7 +136,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 |---|---|
 | Creación desde el carrito | `POST /api/orders` recibe sólo `{ productId, quantity }` por ítem. Debe haber ≥ 1 ítem y `productId` sin repetir. El **precio no se acepta del cliente**: para cada ítem se llama a `GET /api/products/{id}` de `product-service` y se congela `unitPrice`, `productTitle` y `sku` en el ítem |
 | Validación de precios (`TotalMismatchException`) | El total se recalcula en el servidor (Σ `unit_price * quantity`). Si el request trae `total` y no coincide → `400`. Si un producto viene sin `price` → `400` (`InvalidOrderException`) |
-| Estado inicial | Todo pedido nace en `PENDING` con `orderNumber = UUID` y `createdAt/updatedAt = now` |
+| Estado inicial | Todo pedido nace en `PENDING` con `orderNumber` = correlativo numérico asignado desde una secuencia y `createdAt/updatedAt = now` |
 | Máquina de transiciones (`OrderStatus.canTransitionTo`) | `PENDING → PAID \| CANCELLED`; `PAID → SHIPPED \| CANCELLED`; `SHIPPED → DELIVERED`; `DELIVERED` y `CANCELLED` son **finales**. Cualquier otra combinación → `409` (`No se puede pasar de X a Y`) |
 | `POST /{id}/status` | Rechaza `CANCELLED` explícitamente (`Para cancelar un pedido use POST /api/orders/{orderId}/cancel`); valida la transición con la máquina |
 | `POST /{id}/cancel` | Sólo sobre `PENDING` o `PAID` (`cancellable()`); si estaba `PAID` setea `refundRequired=true` y publica además `REFUND_REQUESTED`. Motivo opcional, máx. 500 caracteres |
@@ -145,6 +145,17 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Concurrencia | `@Version` en `orders`: cambios concurrentes → `409` |
 | Outbox transaccional | Los eventos se agregan a `outbox_events` dentro de la misma transacción; `OutboxRelay` (poll cada `1 s`, batch 50, máx. 10 intentos con re-lectura de `FAILED`) los publica a Kafka con key = `aggregateId` |
 | Métricas | Micrometer: `latiendita.orders.create` (timer), `latiendita.orders.created`, `latiendita.orders.revenue`, `latiendita.orders.status.changed{from,to}`, `latiendita.orders.cancelled{refund}`, `latiendita.orders.refunds.requested` |
+
+### 4.4 DTOs (contratos de API)
+
+Campos documentados en §2 (requests) y derivados de las entidades de §4.1 (respuesta). Se omite `version` (auditoría interna).
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `CreateOrderRequest` | `POST /api/orders` | `items[]` con `productId`, `quantity` + `total?` | Ejemplo en §2:27-36; `total` es opcional y se re-valida contra el servidor (`TotalMismatchException`) |
+| `UpdateOrderStatusRequest` | `POST /api/orders/{id}/status` | `status` | Ejemplo en §2; `CANCELLED` rechazado acá |
+| `CancelOrderRequest` | `POST /api/orders/{id}/cancel` | `reason?` | Ejemplo en §2; máx. 500 caracteres |
+| `OrderResponse` | `POST /api/orders`, `GET /api/orders[/{id}]`, cambio de estado y cancelación | `id`, `orderNumber`, `customerId`, `status`, `total`, `cancelReason`, `refundRequired`, `createdAt`, `updatedAt`, `items[]` | De `OrderEntity`; `orderNumber` es correlativo numérico (§4.1). `items[]` = `OrderItemEntity`: `productId`, `productTitle`, `sku`, `quantity`, `unitPrice`, `subtotal` |
 
 ---
 
@@ -241,7 +252,7 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | **Checkout — pasos** Carrito → Envío → Pago → Confirmación | `POST /api/orders` crea el pedido en `PENDING` al salir del carrito/confirmar envío; el paso **Pago** lo resuelve `payment-service` y el resultado llega por Kafka (`PAYMENT_APPROVED` → `PAID`); la confirmación muestra el pedido con `GET /api/orders/{id}` | ✅ Implementado |
 | **Checkout Shipping — resumen** (subtotal, costo de envío, total, "Impuestos incluidos en los precios") | Subtotal y total salen de `POST /api/orders` / `GET /api/orders/{id}`. **Costo de envío no existe** en el modelo ni en el request (el total es sólo Σ subtotales); "Impuestos incluidos" es copy del frontend | ⚠️ `<a implementar>` (campo y cálculo de envío) |
 | **Checkout Shipping — CTAs** "Continuar al pago" / "Volver al carrito" | Frontend; el paso de pago dispara `payment-service` y el estado del pedido queda visible vía `GET /api/orders/{id}` | ✅ Implementado |
-| **Admin Pedidos — tabla** (Pedido `#1042`, Cliente, Fecha, Estado, Total, Acción) | `orderNumber`, `customerId`, `createdAt`, `status`, `total` existen en `OrderResponse`, pero **no hay endpoint de listado global**: `GET /api/orders` sólo devuelve pedidos del usuario actual. Además `orderNumber` es un UUID string, no un correlativo `#1042` (la UI debe formatearlo o guardar un correlativo) | ⚠️ `<a implementar>` (listado global y/o correlativo visible) |
+| **Admin Pedidos — tabla** (Pedido `#1042`, Cliente, Fecha, Estado, Total, Acción) | `orderNumber`, `customerId`, `createdAt`, `status`, `total` existen en `OrderResponse`; `orderNumber` es un correlativo numérico que la UI muestra como `#1042`. **Falta:** endpoint de listado global (`GET /api/orders` sólo devuelve pedidos del usuario actual) | ⚠️ `<a implementar>` (listado global) |
 | **Admin Pedidos — estados mostrados** | Mapeo a `OrderStatus` real: `Pendiente` = `PENDING`, `Pagado` = `PAID`, `Enviado` = `SHIPPED`; además el enum tiene `DELIVERED` (Entregado) y `CANCELLED` (Cancelado) que la UI debe mostrar | ✅ Implementado (mapeo de etiquetas) |
 | **Admin Pedidos — acción de cambiar estado** | `POST /api/orders/{id}/status` con la máquina de transiciones | ⚠️ Sólo para pedidos propios; uso admin global `<a implementar>` |
 | **Admin Resumen — KPI "Ventas de hoy"** ($ + cantidad de pedidos del día) | Sin endpoint de agregación; existen métricas Micrometer (`latiendita.orders.revenue`, `latiendita.orders.created`) como fuente posible | ⚠️ `<a implementar>` |

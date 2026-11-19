@@ -3,13 +3,14 @@
 
 ## 1. Responsabilidad
 
-Gestiona el **perfil del cliente** de la plataforma: alta del registro de cliente a partir de la identidad emitida por Authorizer, datos de contacto, direcciones guardadas para compras futuras, preferencias de newsletter con consentimiento y la vista de consulta del panel de **Admin Clientes**. Es la única fuente de verdad sobre los datos de negocio del cliente (identidad, contacto, direcciones, estado y actividad); otros servicios la consultan, pero nunca almacenan copias de esta información.
+Gestiona el **perfil del cliente** de la plataforma: alta del registro de cliente a partir de la identidad emitida por Authorizer, datos de contacto, preferencias de newsletter con consentimiento y la vista de consulta del panel de **Admin Clientes**. Es la única fuente de verdad sobre los datos de negocio del cliente (identidad, contacto, estado y actividad); otros servicios la consultan, pero nunca almacenan copias de esta información.
 
 **Lo que NO le pertenece** (para evitar solapamientos):
 
 - **Credenciales, contraseñas y recuperación de acceso**: las resuelve **Authorizer** (servicio externo de autenticación, validado por el gateway con JWT HS256/issuer). Este servicio nunca recibe, almacena ni valida contraseñas ni hashes: su clave de identidad es el claim `sub` de Authorizer, propagado en el header `X-User-Id`.
 - **Pedidos**: `order-service`.
 - **Reseñas**: `review-service`.
+- **Direcciones de entrega**: `shipment-service` (`delivery_addresses` es la única fuente de verdad; este servicio no almacena ni expone direcciones).
 
 ---
 
@@ -28,11 +29,7 @@ La identidad llega propagada por el gateway en los headers `X-User-Id` (claim `s
 | `GET` | `/api/customers/me` | Obtiene el perfil del cliente autenticado | — | `200` CustomerDto | Sí (cliente) |
 | `PATCH` | `/api/customers/me` | Actualiza datos de contacto (nombre, apellido, teléfono) | `UpdateCustomerRequest` | `200` CustomerDto | Sí (cliente) |
 | `GET` | `/api/customers` | Listado de clientes para Admin Clientes (paginado; filtros por nombre, email y estado) | — (query params) | `200` `Page<CustomerSummaryDto>` | Sí (admin) |
-| `GET` | `/api/customers/{id}` | Detalle de un cliente para Admin Clientes (datos, dirección, estado y actividad) | — | `200` CustomerDto | Sí (admin) |
-| `GET` | `/api/customers/me/addresses` | Lista las direcciones guardadas del cliente | — | `200` `List<AddressDto>` | Sí (cliente) |
-| `POST` | `/api/customers/me/addresses` | Crea una dirección guardada (checkbox «Guardar esta dirección para futuras compras» del checkout) | `CreateAddressRequest` | `201` AddressDto | Sí (cliente) |
-| `PUT` | `/api/customers/me/addresses/{addressId}` | Actualiza una dirección guardada | `UpdateAddressRequest` | `200` AddressDto | Sí (cliente) |
-| `DELETE` | `/api/customers/me/addresses/{addressId}` | Elimina una dirección guardada | — | `204` | Sí (cliente) |
+| `GET` | `/api/customers/{id}` | Detalle de un cliente para Admin Clientes (datos, estado y actividad) | — | `200` CustomerDto | Sí (admin) |
 | `PUT` | `/api/customers/me/newsletter` | Suscribe o da de baja de la newsletter, registrando el consentimiento | `NewsletterRequest` | `200` NewsletterDto | Sí (cliente) |
 
 *Nota de integración:* el gateway aún no expone `/api/customers/**`; se debe agregar una ruta `Path=/api/customers/**` → `lb://customerService`, y las rutas de listado/detalle de clientes deben exigir `hasRole("admin")` (hoy `anyRequest().authenticated()` sólo autentica).
@@ -87,29 +84,10 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `updated_at` | `timestamptz` | ❌ | ❌ | ❌ | Fecha de modificación (auditoría) |
 | `deleted_at` | `timestamptz` | ❌ | ✅ | ❌ | Borrado lógico (marca de baja) |
 
-#### `<CustomerAddress>` → tabla `customer_addresses`
-
-| Campo | Tipo | PK | Nullable | Unique | Descripción |
-|---|---|---|---|---|---|
-| `id` | `UUID` | ✅ | ❌ | ✅ | Identificador único |
-| `customer_id` | `UUID` | ❌ | ❌ | ❌ | FK → `customers.id` |
-| `first_name` | `varchar(80)` | ❌ | ❌ | ❌ | Nombre del destinatario |
-| `last_name` | `varchar(80)` | ❌ | ❌ | ❌ | Apellido del destinatario |
-| `phone` | `varchar(30)` | ❌ | ❌ | ❌ | Teléfono de la dirección |
-| `address_line` | `varchar(255)` | ❌ | ❌ | ❌ | Dirección (calle y número) |
-| `city` | `varchar(100)` | ❌ | ❌ | ❌ | Ciudad |
-| `province` | `varchar(100)` | ❌ | ❌ | ❌ | Provincia / estado |
-| `postal_code` | `varchar(20)` | ❌ | ❌ | ❌ | Código postal |
-| `reference_notes` | `varchar(255)` | ❌ | ✅ | ❌ | Referencias para la entrega |
-| `is_default` | `boolean` | ❌ | ❌ | ❌ | Dirección sugerida en el checkout |
-| `created_at` | `timestamptz` | ❌ | ❌ | ❌ | Fecha de creación (auditoría) |
-| `updated_at` | `timestamptz` | ❌ | ❌ | ❌ | Fecha de modificación (auditoría) |
-
 ### 4.2 Relaciones
 
 | Relación | Tipo | Descripción |
 |---|---|---|
-| `Customer` 1 → N `CustomerAddress` | Uno-a-muchos | Un cliente puede tener varias direcciones guardadas (reside en `customer_addresses`) |
 | `Customer` 1 → N `Order` | Uno-a-muchos | Un cliente puede tener muchos pedidos (reside en `order-service`; referencia cruzada por `id`/`authorizer_sub`, sin FK) |
 | `Customer` 1 → N `Review` | Uno-a-muchos | Un cliente puede publicar muchas reseñas (reside en `review-service`, sin FK) |
 
@@ -120,9 +98,21 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Identidad | La clave del perfil es el `sub` de Authorizer (`authorizer_sub`); este servicio nunca recibe ni almacena contraseñas ni hashes |
 | Unicidad | `authorizer_sub` y `email` no pueden repetirse |
 | Borrado | Borrado lógico (`deleted_at`); se conserva el historial referenciado por pedidos y reseñas |
-| Direcciones | Sólo el dueño (o un rol `admin`) puede leer o modificar las direcciones de un cliente |
 | Newsletter | La suscripción exige consentimiento explícito con `newsletter_consent_at`; la baja es inmediata y no requiere consentimiento |
 | Invariantes | `created_at <= updated_at`; si `newsletter_opt_in = true` entonces `newsletter_consent_at` no puede ser nulo |
+
+### 4.4 DTOs (contratos de API)
+
+> **Propuesto; aún no implementado.** Servicio *scaffold*: los campos se derivan de la entidad de §4.1 y de lo que exige el wireframe (§7). Sin direcciones: viven en `shipment-service` (`delivery_addresses`).
+
+| DTO | Uso | Campos | Origen / nota |
+|---|---|---|---|
+| `CustomerDto` | `POST /api/customers`, `GET /api/customers/me`, `GET /api/customers/{id}` | `id`, `authorizerSub`, `email`, `firstName`, `lastName`, `phone`, `status`, `newsletterOptIn`, `newsletterConsentAt`, `lastLoginAt`, `createdAt`, `updatedAt` | De `Customer`; se omite `deletedAt` (borrado lógico interno) |
+| `CustomerSummaryDto` | `GET /api/customers` (Admin Clientes) | `id`, `firstName`, `lastName`, `email`, `status`, `lastLoginAt` | Proyección reducida para el listado; filtros por nombre, email y estado (§2) |
+| `CreateCustomerRequest` | `POST /api/customers` | `authorizerSub`, `email`, `firstName`, `lastName`, `phone` | `authorizerSub` se toma del header `X-User-Id`; alta idempotente en el primer login |
+| `UpdateCustomerRequest` | `PATCH /api/customers/me` | `firstName`, `lastName`, `phone` | Datos de contacto (§2) |
+| `NewsletterRequest` | `PUT /api/customers/me/newsletter` | `newsletterOptIn` | El alta exige consentimiento explícito; la baja es inmediata (§4.3) |
+| `NewsletterDto` | `PUT /api/customers/me/newsletter` | `newsletterOptIn`, `newsletterConsentAt` | De `Customer` |
 
 ---
 
@@ -200,8 +190,7 @@ Fuente: `docs/OpenPencil/LaTiendita.fig`, página "WireFrame".
 |---|---|
 | `Register` / `Login` (tarjeta «Auth card») | Solo el perfil: alta idempotente en el primer login con `POST /api/customers` (clave = `sub`). Las credenciales y la contraseña las maneja Authorizer: fuera del alcance |
 | `Password Recovery` (tarjeta «Auth card») | Sin implementación en este servicio; la recuperación de contraseña es responsabilidad de Authorizer |
-| `Checkout → Shipping` («Guardar esta dirección para futuras compras») | CRUD de direcciones guardadas: `GET`/`POST` `/api/customers/me/addresses`, `PUT`/`DELETE` `/api/customers/me/addresses/{addressId}` |
 | `Home` (sección Newsletter) | Suscripción y baja con consentimiento: `PUT /api/customers/me/newsletter` |
-| `Admin → Clientes` (panel junto a Resumen, Productos, Categorías, Pedidos y Pagos) | Listado y detalle con datos, dirección, estado y actividad: `GET /api/customers`, `GET /api/customers/{id}` |
+| `Admin → Clientes` (panel junto a Resumen, Productos, Categorías, Pedidos y Pagos) | Listado y detalle con datos, estado y actividad: `GET /api/customers`, `GET /api/customers/{id}` |
 | `Checkout` / perfil (datos de contacto) | Consulta y actualización: `GET /api/customers/me`, `PATCH /api/customers/me` |
 | `Product Detail`, `Cart`, `Listings`, `Pagos` | No aplica a este servicio (sin responsabilidad propuesta) |
