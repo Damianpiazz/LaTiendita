@@ -19,14 +19,14 @@ export function ProfileDetails({
     <section className="grid gap-6 md:grid-cols-2">
       <article className="flex flex-col gap-4 rounded-wf-md border border-wf-line bg-wf-surface p-5">
         <header className="flex items-center justify-between gap-4">
-          <h2 className="text-base font-bold text-wf-ink">Dirección principal</h2>
-          <span className="text-sm text-wf-ink-secondary">Editar</span>
+          <h2 className="text-base leading-[19px] font-bold text-wf-ink">Dirección principal</h2>
+          <span className="text-sm leading-[17px] text-wf-ink-secondary">Editar</span>
         </header>
 
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-wf-ink-secondary">{address.recipient}</span>
+          <span className="text-sm leading-[17px] text-wf-ink-secondary">{address.recipient}</span>
           {address.lines.map((line) => (
-            <span key={line} className="text-sm text-wf-ink-muted">
+            <span key={line} className="text-sm leading-[17px] text-wf-ink-muted">
               {line}
             </span>
           ))}
@@ -41,12 +41,12 @@ export function ProfileDetails({
 
       <article className="flex flex-col gap-4 rounded-wf-md border border-wf-line bg-wf-surface p-5">
         <header className="flex items-center justify-between gap-4">
-          <h2 className="text-base font-bold text-wf-ink">Preferencias</h2>
-          <span className="text-sm text-wf-ink-secondary">Editar</span>
+          <h2 className="text-base leading-[19px] font-bold text-wf-ink">Preferencias</h2>
+          <span className="text-sm leading-[17px] text-wf-ink-secondary">Editar</span>
         </header>
 
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm text-wf-ink-secondary">Newsletter</span>
+          <span className="text-sm leading-[17px] text-wf-ink-secondary">Newsletter</span>
           <span
             aria-hidden
             className={cn(
@@ -60,7 +60,7 @@ export function ProfileDetails({
           </span>
         </div>
 
-        <p className="text-sm text-wf-ink-muted">
+        <p className="text-sm leading-[17px] text-wf-ink-muted">
           Recibí novedades y ofertas por email.
         </p>
 

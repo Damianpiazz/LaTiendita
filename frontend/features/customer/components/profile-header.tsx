@@ -11,8 +11,8 @@ export function ProfileHeader({ profile }: { profile: CustomerProfile }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold text-wf-ink">Hola, {profile.firstName}</h1>
-        <p className="text-sm text-wf-ink-muted">
+        <h1 className="text-2xl leading-[29px] font-bold text-wf-ink">Hola, {profile.firstName}</h1>
+        <p className="text-sm leading-[17px] text-wf-ink-muted">
           Revisá tus compras, tu actividad y tus datos en un solo lugar.
         </p>
       </div>

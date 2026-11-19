@@ -130,9 +130,11 @@ definida. utilizando las librerias y dependencias que existen en el package.json
 
 - Frame read live (page `0:3`): `2101537842:6` 1440 × 1788 = header 72 + breadcrumb 49 +
   account content 1238 + benefits 124 + footer 305.
-- Account content height checks out from the main column: 54 + 127 + 81 + 285 + 253 + 174 = 974
-  blocks, plus 5 × 32 gaps = 160, plus 40 top and 64 bottom = 1238 exactly, so the nav (352) is
-  shorter than the column and does not drive the band height.
+- Account content drawn: 54 + 127 + 81 + 285 + 253 + 174 = 974 blocks, plus 5 × 32 gaps = 160,
+  plus 40 top and 64 bottom = 1238. The nav (352) is shorter than the column and does not drive
+  the band height. Rendered after the leading correction: 54 + 129 + 83 + 287 + 255 + 176 = 984;
+  the +10 is the 1px hairline of each of the five bordered cards (CSS `border` adds to the auto
+  height, the drawn frame measures the stroke inside the box). Accepted as border accounting.
 - Measured palette: canvas `#F5F5F6`, surface `#FFFFFF`, subtle `#E4E4E7`, inverse `#27272A`,
   hairline `#E4E4E7`, strong `#A1A1AA`, ink `#18181B`, secondary `#3F3F46`, muted `#71717A`,
   placeholder `#A1A1AA`. All of them already exist as `wf-*` tokens.
@@ -150,5 +152,12 @@ definida. utilizando las librerias y dependencias que existen en el package.json
   `npm run build` 61 static pages, `/mi-cuenta` prerendered as static;
   `check-profile.mjs` 48 copy probes + 5 structural probes, all present;
   `check-regressions.mjs` 56/56 prerendered pages, no regressions.
-- Deviation on record: the two bottom cards are equal-height (grid stretch) while the frame
-  draws 174 and 172; the 2px difference comes from the drawn text line boxes, not from spacing.
+- Deviation on record: every bordered card renders 2px taller than the frame (card 129 vs 127,
+  stats 83 vs 81, activity 287 vs 285, purchases 255 vs 253, details 176 vs 174) because the CSS
+  hairline adds to the auto height. The two bottom cards are equal-height (grid stretch) while
+  the frame draws 174 and 172.
+- Correction (verification-driven): the first implementation used Tailwind's default line heights
+  (32/28/24/20/16) instead of the frame's line boxes. The typography token sets `line-height: 1.2`,
+  and the frame measures 29/22/19/17/15. Explicit `leading-[Npx]` is now set on the header, the
+  identity card, the stat strip, both section heads and the details cards, which removes the
+  +6/+11/+9/+5/+5/+16 drift the verifier measured.

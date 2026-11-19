@@ -12,8 +12,8 @@ export function ProfileActivity({ activity }: { activity: CustomerActivity[] }) 
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-wf-ink">Actividad reciente</h2>
-        <span className="shrink-0 text-sm text-wf-ink-secondary">
+        <h2 className="text-2xl leading-[29px] font-bold text-wf-ink">Actividad reciente</h2>
+        <span className="shrink-0 text-sm leading-[17px] text-wf-ink-secondary">
           Ver toda la actividad →
         </span>
       </div>

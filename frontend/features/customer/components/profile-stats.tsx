@@ -31,8 +31,8 @@ export function ProfileStats({ stats }: { stats: CustomerStats }) {
             />
           ) : null}
           <div className="flex flex-col gap-1 xl:grow">
-            <span className="text-xs text-wf-ink-muted">{figure.label}</span>
-            <span className="text-lg font-bold text-wf-ink">{figure.value}</span>
+            <span className="text-xs leading-[15px] text-wf-ink-muted">{figure.label}</span>
+            <span className="text-lg leading-[22px] font-bold text-wf-ink">{figure.value}</span>
           </div>
         </Fragment>
       ))}

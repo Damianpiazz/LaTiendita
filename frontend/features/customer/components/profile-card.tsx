@@ -18,8 +18,8 @@ export function ProfileCard({ profile }: { profile: CustomerProfile }) {
       </span>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <h2 className="text-lg font-bold text-wf-ink">{profile.name}</h2>
-        <p className="text-sm text-wf-ink-muted">
+        <h2 className="text-lg leading-[22px] font-bold text-wf-ink">{profile.name}</h2>
+        <p className="text-sm leading-[17px] text-wf-ink-muted">
           {`${profile.email}  ·  ${profile.phone}`}
         </p>
         <div className="flex flex-wrap items-center gap-2">
