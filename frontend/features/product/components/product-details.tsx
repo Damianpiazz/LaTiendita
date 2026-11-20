@@ -1,84 +1,56 @@
-import { cn } from "@/lib/utils";
+"use client";
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { ProductDescription } from "@/features/product/components/product-description";
+import { ProductSpecifications } from "@/features/product/components/product-specifications";
 import type { ProductDetail } from "@/features/product/types";
 
-/** Tabs, description and specs block of the detail screen. */
+/**
+ * Active tab styling shared by both triggers.
+ *
+ * The shadcn primitive stretches triggers with `flex-1` and paints a
+ * `bg-background` block on the active one. Both fight the wireframe, which
+ * shows compact labels with a 3px ink underline over a single hairline rule.
+ */
+const triggerClassName =
+  "h-auto flex-none rounded-none border-0 bg-transparent px-0.5 py-3 text-[15px] font-normal text-wf-ink-muted shadow-none transition-all hover:text-wf-ink-secondary active:scale-[0.98] data-active:bg-transparent data-active:font-bold data-active:text-wf-ink data-active:shadow-none after:-bottom-px after:h-[3px] after:bg-wf-inverse focus-visible:ring-2 focus-visible:ring-wf-inverse/40 focus-visible:ring-offset-2";
+
+/**
+ * Interactive description/specifications tabs of the detail screen.
+ *
+ * This is the only stateful UI boundary on the page: the active tab lives
+ * here while `ProductDetailPage` stays a server data orchestrator. Reviews
+ * render outside this tree and remain visible regardless of the active tab.
+ */
 export function ProductDetails({ product }: { product: ProductDetail }) {
-  const tabs = [
-    "Descripción",
-    "Especificaciones",
-    "Envíos y devoluciones",
-    `Reseñas (${product.reviewCount})`,
-  ];
-
   return (
-    <section aria-labelledby="producto-detalle" className="px-12 pt-10 pb-12">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-7">
-        <div className="flex flex-col">
-          <div className="flex flex-wrap gap-8">
-            {tabs.map((tab, index) => (
-              <div key={tab} className="flex flex-col gap-2">
-                <span
-                  className={cn(
-                    "text-[15px]",
-                    index === 0
-                      ? "font-bold text-wf-ink"
-                      : "text-wf-ink-muted",
-                  )}
-                >
-                  {tab}
-                </span>
-                <span
-                  aria-hidden
-                  className={cn(
-                    "h-[3px] rounded-full",
-                    index === 0 ? "bg-wf-inverse" : "bg-transparent",
-                  )}
-                />
-              </div>
-            ))}
-          </div>
-          <div aria-hidden className="h-px bg-wf-line" />
-        </div>
-
-        <div className="flex flex-col gap-12 lg:flex-row">
-          <div className="flex w-full flex-col gap-3.5 lg:w-[736px] lg:shrink-0">
-            <h2 id="producto-detalle" className="text-lg font-bold text-wf-ink">
+    <section aria-label="Detalle del producto" className="px-12 pt-10 pb-12">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col">
+        <Tabs defaultValue="descripcion" className="gap-7">
+          <TabsList
+            variant="line"
+            className="h-auto w-full justify-start gap-8 rounded-none border-b border-wf-line bg-transparent p-0 group-data-horizontal/tabs:h-auto"
+          >
+            <TabsTrigger value="descripcion" className={triggerClassName}>
               Descripción
-            </h2>
-
-            {product.description.map((paragraph) => (
-              <p
-                key={paragraph}
-                className="text-sm leading-6 text-wf-ink-secondary"
-              >
-                {paragraph}
-              </p>
-            ))}
-
-            <ul className="flex flex-col gap-2 text-sm leading-6 text-wf-ink-secondary">
-              {product.highlights.map((highlight) => (
-                <li key={highlight}>· {highlight}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="w-full self-start overflow-hidden rounded-wf-card border border-wf-line bg-wf-surface lg:w-[560px] lg:shrink-0">
-            <h3 className="px-4 py-3.5 text-[15px] font-bold text-wf-ink">
+            </TabsTrigger>
+            <TabsTrigger value="especificaciones" className={triggerClassName}>
               Especificaciones
-            </h3>
-            <dl>
-              {product.specs.map((spec) => (
-                <div
-                  key={spec.label}
-                  className="flex items-center justify-between border-t border-wf-line px-4 py-3 text-[13px]"
-                >
-                  <dt className="text-wf-ink-muted">{spec.label}</dt>
-                  <dd className="text-wf-ink">{spec.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="descripcion">
+            <ProductDescription product={product} />
+          </TabsContent>
+          <TabsContent value="especificaciones">
+            <ProductSpecifications product={product} />
+          </TabsContent>
+        </Tabs>
       </div>
     </section>
   );
