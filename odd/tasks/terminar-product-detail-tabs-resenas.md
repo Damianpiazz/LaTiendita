@@ -25,7 +25,7 @@ S6 — Verificación: RED antes de GREEN para las reglas nuevas; `npx vitest run
 | T1 | S2-S3, S6 | inline | done | RED: `product-detail-page.test.tsx` falló con `Unable to find role "tab"` y `Found multiple elements ... "Reseñas (6)"`; commit `afd294c` |
 | T2 | S2-S4 | inline | done | shadcn `tabs.tsx` instalado; `ProductDescription`/`ProductSpecifications` extraídos; `ProductDetails` es Client Component con 2 tabs; GREEN 2/2; commit `afd294c` |
 | T3 | S5 | inline | done | `ReviewsPage` + ruta `/productos/[slug]/resenas`; RED (módulo ausente) → GREEN 1/1; `getReviews` 1-based mock / 0-based real vía adaptador |
-| T4 | S6 | inline | pending | vitest 8 archivos/20 tests verdes; lint 0 errores (1 warning preexistente); build mock OK con la nueva ruta en Partial Prerender; humo real 200 con 2 tabs, `resenas-titulo`, `Cliente verificado` y ruta de reseñas; RDD assess en curso |
+| T4 | S6 | inline | done | vitest 8 archivos/20 tests verdes; lint 0 errores (1 warning preexistente); build mock OK con la nueva ruta en Partial Prerender; humo real 200 con 2 tabs, `resenas-titulo`, `Cliente verificado` y ruta de reseñas; RDD: ambos work units `medium`/`under_budget`, sin review nativo |
 
 ## Log
 
@@ -42,3 +42,5 @@ L1 (verbatim): "Quiero que me termines de implementar la Product Detail Wirefram
 - T3: `ReviewsPage` paraleliza `getReviewSummary` y `getReviews` (regla `async-parallel` de `vercel-react-best-practices`). `PAGE_SIZE=6`, paginación con `<Link>` y `aria-current="page"`; la ruta normaliza `searchParams.page` (string o string[]) a un entero positivo y el componente lo acota al total real.
 - Humo real con `NEXT_PUBLIC_USE_MOCKS=false` y stack Docker healthy: `/productos/auriculares-inalambricos` y `/productos/auriculares-inalambricos/resenas?page=1` devolvieron 200; el HTML del detalle tiene exactamente 2 `role="tab"`, `resenas-titulo` y `Cliente verificado`, sin 401/500. El dev server de prueba se detuvo al terminar.
 - Nota de datos: el mock declara 124 reseñas pero siembra 2 tarjetas, así que las páginas 2+ del mock están vacías por diseño de la semilla; el backend real sirve 6 reseñas y el adaptador pagina correctamente. `installmentCount` y `soldCount` siguen con defaults por falta de fuente backend.
+- RDD: `gentle-ai review mode status` = on (global). Assess de `993dcb9..afd294c` = `risk: medium`, `review_due: false`, `review_due_reason: under_budget` (6 paths, 424 líneas; el primer intento se bloqueó por archivos untracked del siguiente work unit y se reran con `--untracked-scope=exclude`). Assess de `afd294c..778ed53` = `risk: medium`, `review_due: false`, `under_budget` (4 paths, 227 líneas). No se inició ciclo de review nativo; el límite de review sigue en `778ed53`.
+- `docs/OpenPencil/LaTiendita.fig` sigue dirty desde antes de este trabajo y se excluye de todos los commits; el usuario hace el push.
