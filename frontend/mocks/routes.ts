@@ -31,6 +31,16 @@ function readPositiveInt(searchParams: URLSearchParams, key: string, fallback: n
   return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
+function readBody<T>(data: unknown): T {
+  return typeof data === "string" ? (JSON.parse(data) as T) : (data as T);
+}
+
+type CategoryUpdate = {
+  categoryId?: string;
+  id?: string;
+  featured?: boolean;
+};
+
 /**
  * Mock of the catalog, review and admin APIs.
  *
@@ -80,7 +90,7 @@ export const mockRoutes: MockRoute[] = [
   },
   {
     method: "GET",
-    path: "/categories",
+    path: "/api/categories",
     handler: ({ searchParams }) => {
       const featured = readFeatured(searchParams);
 
@@ -90,14 +100,35 @@ export const mockRoutes: MockRoute[] = [
     },
   },
   {
+    method: "PUT",
+    path: "/api/categories",
+    handler: ({ data }) => {
+      const update = readBody<CategoryUpdate>(data);
+      const id = String(update.categoryId ?? update.id ?? "");
+      const featured = Boolean(update.featured);
+      const catalog = categories.find((category) => category.id === id || category.slug === id);
+      const admin = adminCategories.items.find((category) => category.id === id || category.slug === id);
+
+      if (catalog) {
+        catalog.featured = featured;
+      }
+
+      if (admin) {
+        admin.featured = featured;
+      }
+
+      return { ...update, featured };
+    },
+  },
+  {
     method: "GET",
-    path: "/categories/:slug",
+    path: "/api/categories/:slug",
     handler: ({ params }) =>
       categories.find((category) => category.slug === params.slug),
   },
   {
     method: "GET",
-    path: "/products",
+    path: "/api/products",
     handler: ({ searchParams }) => {
       const featured = readFeatured(searchParams);
       const categoryId = searchParams.get("categoryId");
@@ -113,7 +144,7 @@ export const mockRoutes: MockRoute[] = [
   },
   {
     method: "GET",
-    path: "/products/:slug",
+    path: "/api/products/:slug",
     handler: ({ params }) =>
       productDetails.find((product) => product.slug === params.slug),
   },

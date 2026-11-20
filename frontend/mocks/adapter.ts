@@ -9,10 +9,12 @@ export type MockRouteContext = {
   searchParams: URLSearchParams;
   /** Dynamic segments captured from the route pattern, e.g. `{ slug: "..." }`. */
   params: Record<string, string>;
+  /** Serialized request body, so mutation routes can answer like the API. */
+  data: unknown;
 };
 
 export type MockRoute = {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PUT";
   /** Static path or a pattern with `:param` segments, e.g. `/products/:slug`. */
   path: string;
   handler: (context: MockRouteContext) => unknown;
@@ -96,7 +98,7 @@ export function createMockAdapter(routes: MockRoute[]): AxiosAdapter {
         continue;
       }
 
-      const data = candidate.handler({ searchParams, params });
+      const data = candidate.handler({ searchParams, params, data: config.data });
 
       if (data === undefined) {
         throw new AxiosError(

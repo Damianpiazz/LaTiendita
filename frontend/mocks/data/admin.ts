@@ -140,6 +140,7 @@ export const adminCategories: AdminCategories = {
         "Remeras, polos y remerones. La categoría con más movimiento de la tienda.",
       productCount: 14,
       lowStockCount: 3,
+      featured: true,
     },
     {
       id: "pantalones",
@@ -148,6 +149,7 @@ export const adminCategories: AdminCategories = {
       description: "Jeans, chinos y pantalones de vestir para todos los días.",
       productCount: 9,
       lowStockCount: 1,
+      featured: false,
     },
     {
       id: "buzos",
@@ -156,6 +158,7 @@ export const adminCategories: AdminCategories = {
       description: "Buzos, hoodies y crewnecks de algodón.",
       productCount: 8,
       lowStockCount: 2,
+      featured: false,
     },
     {
       id: "zapatillas",
@@ -164,6 +167,7 @@ export const adminCategories: AdminCategories = {
       description: "Zapatillas urbanas y de running para completar el look.",
       productCount: 6,
       lowStockCount: 1,
+      featured: true,
     },
     {
       id: "accesorios",
@@ -172,6 +176,7 @@ export const adminCategories: AdminCategories = {
       description: "Gorras, cinturones y detalles que cierran el outfit.",
       productCount: 9,
       lowStockCount: 2,
+      featured: false,
     },
     {
       id: "camperas",
@@ -180,6 +185,7 @@ export const adminCategories: AdminCategories = {
       description: "Camperas livianas y rompevientos para media estación.",
       productCount: 2,
       lowStockCount: 0,
+      featured: false,
     },
   ],
   selectedId: "remeras",

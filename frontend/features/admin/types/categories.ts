@@ -7,6 +7,8 @@ export type AdminCategory = {
   description: string;
   productCount: number;
   lowStockCount: number;
+  /** Whether the category is shown in the Home wireframe grid. */
+  featured: boolean;
 };
 
 /**

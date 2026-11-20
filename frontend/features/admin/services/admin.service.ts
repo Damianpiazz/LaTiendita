@@ -1,5 +1,6 @@
 import { cacheLife } from "next/cache";
 
+import { env } from "@/config/env";
 import type {
   AdminCategories,
   AdminClients,
@@ -36,14 +37,56 @@ export async function getAdminNavigation(): Promise<AdminNavigationCounts> {
   return data;
 }
 
-/** Categories list and the row the detail card opens. */
+type Page<T> = { content: T[] };
+
+/** Backend `CategoryDto`, plus the frontend-shaped seed served by the mock adapter. */
+type CategoryDto = {
+  categoryId?: string | number;
+  id?: string | number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  featured?: boolean;
+  productCount?: number;
+};
+
+/** The real API serves Spring `Page`; mock mode still serves plain arrays. */
+function unwrapPage<T>(payload: Page<T> | T[]): T[] {
+  return Array.isArray(payload) ? payload : payload.content;
+}
+
+/**
+ * Categories list and the row the detail card opens.
+ *
+ * In real mode the admin reads the public catalog so the same category ids back
+ * both the admin toggle and the Home grid. Mock mode keeps the wireframe seed.
+ */
 export async function getAdminCategories(): Promise<AdminCategories> {
   "use cache";
   cacheLife("hours");
 
-  const { data } = await httpClient.get<AdminCategories>("/admin/categories");
+  if (env.useMocks) {
+    const { data } = await httpClient.get<AdminCategories>("/admin/categories");
 
-  return data;
+    return data;
+  }
+
+  const { data } = await httpClient.get<Page<CategoryDto> | CategoryDto[]>("/api/categories");
+  const items = unwrapPage(data).map((dto) => ({
+    id: String(dto.categoryId ?? dto.id),
+    name: dto.name,
+    slug: dto.slug,
+    description: dto.description ?? "",
+    productCount: Number(dto.productCount ?? 0),
+    lowStockCount: 0,
+    featured: Boolean(dto.featured),
+  }));
+
+  return {
+    items,
+    selectedId: items[0]?.id ?? "",
+    updatedLabel: "hoy",
+  };
 }
 
 /** Products table: visible page, store totals and the low-stock threshold. */

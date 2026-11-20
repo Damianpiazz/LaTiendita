@@ -1,12 +1,14 @@
 import Link from "next/link";
 
+import { setCategoryFeatured } from "@/features/admin/actions/category-actions";
 import type { AdminCategory } from "@/features/admin/types";
 
 /**
  * Detail card of the selected category, 412 wide in the frame.
  *
- * `Editar` and `Eliminar` are presentational because no form exists yet; the
- * store link is real and opens the public category page.
+ * The featured control persists through the catalog update endpoint; `Editar`
+ * and `Eliminar` are still presentational, and the store link opens the public
+ * category page.
  */
 export function CategoryDetailCard({
   category,
@@ -34,6 +36,21 @@ export function CategoryDetailCard({
       </div>
 
       <p className="text-sm text-wf-ink-secondary">{category.description}</p>
+
+      <form action={setCategoryFeatured}>
+        <input type="hidden" name="categoryId" value={category.id} />
+        <input
+          type="hidden"
+          name="featured"
+          value={category.featured ? "false" : "true"}
+        />
+        <button
+          type="submit"
+          className="flex h-10 w-full items-center justify-center rounded-wf-sm border border-wf-line-strong bg-wf-surface text-sm font-medium text-wf-ink-secondary transition-colors hover:text-wf-ink"
+        >
+          {category.featured ? "Quitar de destacadas" : "Marcar como destacada"}
+        </button>
+      </form>
 
       <div className="h-px bg-wf-line" />
 
