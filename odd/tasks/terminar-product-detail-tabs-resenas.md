@@ -22,10 +22,10 @@ S6 — Verificación: RED antes de GREEN para las reglas nuevas; `npx vitest run
 
 | ID | Specs | Route | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| T1 | S2-S3, S6 | inline | done | RED: `product-detail-page.test.tsx` falló con `Unable to find role "tab"` y `Found multiple elements ... "Reseñas (6)"` |
-| T2 | S2-S4 | inline | done | shadcn `tabs.tsx` instalado; `ProductDescription`/`ProductSpecifications` extraídos; `ProductDetails` es Client Component con 2 tabs; GREEN 2/2 |
+| T1 | S2-S3, S6 | inline | done | RED: `product-detail-page.test.tsx` falló con `Unable to find role "tab"` y `Found multiple elements ... "Reseñas (6)"`; commit `afd294c` |
+| T2 | S2-S4 | inline | done | shadcn `tabs.tsx` instalado; `ProductDescription`/`ProductSpecifications` extraídos; `ProductDetails` es Client Component con 2 tabs; GREEN 2/2; commit `afd294c` |
 | T3 | S5 | inline | done | `ReviewsPage` + ruta `/productos/[slug]/resenas`; RED (módulo ausente) → GREEN 1/1; `getReviews` 1-based mock / 0-based real vía adaptador |
-| T4 | S6 | inline | pending | vitest 8 archivos/20 tests verdes; lint 0 errores; build mock OK; humo real en curso; RDD assess por work unit |
+| T4 | S6 | inline | pending | vitest 8 archivos/20 tests verdes; lint 0 errores (1 warning preexistente); build mock OK con la nueva ruta en Partial Prerender; humo real 200 con 2 tabs, `resenas-titulo`, `Cliente verificado` y ruta de reseñas; RDD assess en curso |
 
 ## Log
 
@@ -39,3 +39,6 @@ L1 (verbatim): "Quiero que me termines de implementar la Product Detail Wirefram
 - Los tabs se ven feos con las clases crudas del primitivo: éste aplica `flex-1`, `h-[calc(100%-1px)]` y `data-active:bg-background`. Se corrigió con `flex-none`, `h-auto`, `bg-transparent`, subrayado `after:-bottom-px after:h-[3px] after:bg-wf-inverse` (idéntico al frame `0:309`), `gap-8` (32 px del wireframe) y tokens `wf-*`; verificado en el HTML renderizado del humo real.
 - `ReviewsSection` queda fuera del árbol de tabs, así que las reseñas no dependen del tab activo. `ProductDetails` es el único Client Component nuevo; la página sigue siendo orquestador de datos.
 - Estrategia de entrega `ask-on-risk`: el forecast supera ~400 líneas authored, pero el usuario hace push directo de `main` sin PR, así que no hay cadena de PR aplicable; se entregan work-unit commits en `main`, igual que la feature anterior.
+- T3: `ReviewsPage` paraleliza `getReviewSummary` y `getReviews` (regla `async-parallel` de `vercel-react-best-practices`). `PAGE_SIZE=6`, paginación con `<Link>` y `aria-current="page"`; la ruta normaliza `searchParams.page` (string o string[]) a un entero positivo y el componente lo acota al total real.
+- Humo real con `NEXT_PUBLIC_USE_MOCKS=false` y stack Docker healthy: `/productos/auriculares-inalambricos` y `/productos/auriculares-inalambricos/resenas?page=1` devolvieron 200; el HTML del detalle tiene exactamente 2 `role="tab"`, `resenas-titulo` y `Cliente verificado`, sin 401/500. El dev server de prueba se detuvo al terminar.
+- Nota de datos: el mock declara 124 reseñas pero siembra 2 tarjetas, así que las páginas 2+ del mock están vacías por diseño de la semilla; el backend real sirve 6 reseñas y el adaptador pagina correctamente. `installmentCount` y `soldCount` siguen con defaults por falta de fuente backend.
