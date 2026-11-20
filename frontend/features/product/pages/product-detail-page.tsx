@@ -6,6 +6,7 @@ import { ProductDetails } from "@/features/product/components/product-details";
 import { ProductGallery } from "@/features/product/components/product-gallery";
 import { ProductInfo } from "@/features/product/components/product-info";
 import { RelatedProducts } from "@/features/product/components/related-products";
+import { withReviewSummary } from "@/features/product/helpers/with-review-summary";
 import {
   findProductBySlug,
   getRelatedProducts,
@@ -34,6 +35,7 @@ export async function ProductDetailPage({ slug }: { slug: string }) {
     getReviews(product.id, { page: 1, size: 2 }),
     getRelatedProducts(4),
   ]);
+  const productWithReviews = withReviewSummary(product, summary);
 
   return (
     <>
@@ -49,11 +51,11 @@ export async function ProductDetailPage({ slug }: { slug: string }) {
       <section className="bg-wf-surface px-12 py-10">
         <div className="mx-auto grid w-full max-w-[1440px] gap-14 lg:grid-cols-[640px_minmax(0,1fr)]">
           <ProductGallery count={product.galleryCount} />
-          <ProductInfo product={product} />
+          <ProductInfo product={productWithReviews} />
         </div>
       </section>
 
-      <ProductDetails product={product} />
+      <ProductDetails product={productWithReviews} />
 
       <ReviewsSection
         product={product}
