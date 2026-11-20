@@ -48,7 +48,7 @@ class CategoryApiIntegrationTest {
                         .content(body(new CategoryDto(null, "Electrónica", "Devices"))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", containsString("/api/categories/")))
-                .andExpect(jsonPath("$.categoryId").isNumber())
+                .andExpect(jsonPath("$.categoryId").isString())
                 .andExpect(jsonPath("$.name").value("Electrónica"));
     }
 

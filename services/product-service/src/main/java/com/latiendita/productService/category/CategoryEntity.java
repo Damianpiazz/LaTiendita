@@ -40,6 +40,15 @@ public class CategoryEntity {
     @Column(length = 500)
     private String description;
 
+    /**
+     * Categoría destacada en la Home. El default en Java cubre las entidades
+     * nuevas y el default de la columna cubre las filas ya existentes cuando
+     * Hibernate aplica `ddl-auto=update` (único mecanismo de esquema del repo).
+     */
+    @Builder.Default
+    @Column(name = "featured", nullable = false, columnDefinition = "boolean default false")
+    private boolean featured = false;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;

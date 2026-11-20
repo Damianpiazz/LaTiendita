@@ -23,16 +23,16 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://productServic
 | `PUT` | `/api/products` | Actualiza un producto (el ID viene en el body) | `ProductDto` | `200` ProductDto | Sí (admin, vía gateway) |
 | `PUT` | `/api/products/{productId}` | Actualiza un producto (el ID de la ruta tiene prioridad) | `ProductDto` | `200` ProductDto | Sí (admin, vía gateway) |
 | `DELETE` | `/api/products/{productId}` | Elimina un producto (borrado físico) | — | `204` | Sí (admin, vía gateway) |
-| `GET` | `/api/categories` | Listado paginado de categorías (`Pageable`, con `sort` validado) | — | `200` Page\<CategoryDto\> | No |
+| `GET` | `/api/categories` | Listado paginado de categorías (`Pageable`, con `sort` validado) y filtro opcional `featured` para la Home | — | `200` Page\<CategoryDto\> | No |
 | `GET` | `/api/categories/paging` | Listado paginado con `page` (default `0`) y `size` (default `10`) | — | `200` Page\<CategoryDto\> | No |
 | `GET` | `/api/categories/paging-and-sorting` | Listado paginado y ordenado con `pageNo` (default `0`), `pageSize` (default `10`) y `sortBy` (default `categoryId`) | — | `200` Page\<CategoryDto\> | No |
-| `GET` | `/api/categories/{categoryId}` | Obtiene una categoría por su ID | — | `200` CategoryDto | No |
+| `GET` | `/api/categories/{categoryIdOrSlug}` | Obtiene una categoría por su ID numérico histórico o por el `slug` derivado de su nombre | — | `200` CategoryDto | No |
 | `POST` | `/api/categories` | Crea una categoría (valida nombre duplicado) | `CategoryDto` | `201` CategoryDto + `Location` | Sí (admin, vía gateway) |
 | `PUT` | `/api/categories` | Actualiza una categoría (el ID viene en el body) | `CategoryDto` | `200` CategoryDto | Sí (admin, vía gateway) |
 | `PUT` | `/api/categories/{categoryId}` | Actualiza una categoría (el ID de la ruta tiene prioridad) | `CategoryDto` | `200` CategoryDto | Sí (admin, vía gateway) |
 | `DELETE` | `/api/categories/{categoryId}` | Elimina una categoría (borrado físico) | — | `204` | Sí (admin, vía gateway) |
 
-**Comportamiento de `sort`:** formato `propiedad` o `propiedad,asc|desc`. Propiedades permitidas en productos: `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`, `slug`, `subcategory`, `featured`, `originalPrice`, `fulfillment`; en categorías: `id`, `name`, `description`. Cualquier otra (incluidos `-id` o `campo:1`) responde `400` vía `SortValidator` **antes** de llegar a JPA.
+**Comportamiento de `sort`:** formato `propiedad` o `propiedad,asc|desc`. Propiedades permitidas en productos: `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`, `slug`, `subcategory`, `featured`, `originalPrice`, `fulfillment`; en categorías: `id`, `name`, `description`, `featured`. Cualquier otra (incluidos `-id` o `campo:1`) responde `400` vía `SortValidator` **antes** de llegar a JPA.
 
 **Filtros combinables de `GET /api/products`:** `q` + `categoryId` + `featured`, y cualquier subconjunto (incluido ninguno). Se resuelven con una única query JPQL con parámetros anulables, sin inferencia de tipos ante `null`.
 
@@ -109,6 +109,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `id` | `bigserial` | ✅ | ❌ | ✅ | Identificador único |
 | `name` | `varchar(100)` | ❌ | ❌ | ✅ | Nombre único de la categoría (`@NotBlank`) |
 | `description` | `varchar(500)` | ❌ | ❌ | ❌ | Descripción de la categoría |
+| `featured` | `boolean` | ❌ | ❌ | ❌ | Categoría mostrada en la Home; default `false` para filas nuevas y existentes |
 | `version` | `bigint` | ❌ | ❌ | ❌ | Optimistic locking (`@Version`) |
 
 ### 4.2 Relaciones
@@ -136,7 +137,7 @@ Campos derivados de las entidades de §4.1 y de lo que consumen las pantallas de
 | DTO | Uso | Campos | Origen / nota |
 |---|---|---|---|
 | `ProductDto` | `GET /api/products`, `GET /api/products/{productIdOrSlug}`, body de `POST`/`PUT /api/products` | Históricos: `productId`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`. Alias derivados: `id` (= `productId` como string), `name` (= `title`), `stock` (= `quantity`), `galleryCount`. Catálogo/detalle: `slug`, `categoryName`, `subcategory`, `featured`, `originalPrice`, `fulfillment`, `images`, `description`, `highlights`, `specs` (`[{label,value}]`) | La entidad conserva los campos históricos; el mapper agrega los alias y el `categoryName` (resuelto con `findAllById` para evitar N+1). Si `images` viene vacío, usa `imageUrl` como única imagen. **No incluye** `installmentCount`, `rating`, `reviewCount` ni `soldCount`: cuotas y valoraciones quedan fuera de este servicio |
-| `CategoryDto` | `GET /api/categories[/{id}]`, body de `POST`/`PUT /api/categories` | `id`, `name`, `description` | Proyección directa de `CategoryEntity` |
+| `CategoryDto` | `GET /api/categories[/{idOrSlug}]`, body de `POST`/`PUT /api/categories` | `categoryId` (string en JSON), `name`, `description`, `slug`, `featured`, `productCount` | `slug` se deriva del `name` con la misma normalización que el catálogo; `productCount` se calcula con `countByCategoryId`; `featured` es el flag persistido. El constructor de 3 argumentos sigue disponible para clientes internos |
 
 > Nota de compatibilidad: el constructor de 7 argumentos de `ProductDto` (`productId, title, imageUrl, sku, price, quantity, categoryId`) se conserva para los clientes internos que aún lo usan; los campos nuevos defaultan a vacío/`false` en ese constructor. Clientes como `order-service` y `cart-service` deserializan los campos históricos sin cambios.
 
@@ -213,7 +214,7 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 
 | Pantalla | Soporte en este servicio | Estado |
 |---|---|---|
-| **Home — sección "Categories"** (grilla de categorías) | `GET /api/categories` (paginado) alimenta las cards de categorías | ✅ Implementado |
+| **Home — sección "Categories"** (grilla de categorías) | `GET /api/categories?featured=true` (paginado) alimenta las cards de categorías; el flag `featured` se administra desde el ABM | ✅ Implementado |
 | **Home — sección "Featured"** (grilla de productos destacados con imagen, nombre, precio y valoración) | `GET /api/products?featured=true` filtra por el flag `featured`; imagen → `GET /api/products/{id}/image`, nombre/precio → aliases `name`/`price` del `ProductDto`. **Valoración** no existe acá: la aporta `review-service` | ✅ Destacado implementado; valoración: fuera de este servicio |
 | **Categories (listado)** — título, toolbar de búsqueda/filtros, grilla de cards | `GET /api/categories` (+ `sort` validado); búsqueda/filtros de categorías más allá del paginado: `<a implementar>` | ⚠️ Parcial |
 | **Category "Tecnología" (listado de productos)** — breadcrumb, toolbar de filtros y orden, grilla, paginación | `GET /api/products?categoryId={id}&q={texto}&page=&size=&sort=` (filtros combinables, paginación `Page`, sort con allowlist). El breadcrumb resuelve el nombre con `GET /api/categories/{id}` | ✅ Implementado |
@@ -225,5 +226,5 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | **Admin Productos** — ABM (`+ Nuevo producto`, editar, eliminar) | `POST /api/products`, `PUT /api/products[/{id}]`, `DELETE /api/products/{id}`, `GET /api/products/{id}` | ✅ Implementado |
 | **Admin Productos** — campos: nombre, precio, stock, categoría, SKU | `title`, `price`, `quantity`, `categoryId` (valida existencia), `sku` (único) | ✅ Implementado |
 | **Admin Productos** — campos: descripción, imágenes (subida), estado | `description`, `highlights`, `images`, `specs` y `featured` ya se envían en el `ProductDto` de `POST`/`PUT`; la **subida** de archivos sigue pendiente (la galería se envía como JSON de URLs/claves) | ⚠️ Campos implementados; subida: `<a implementar>` |
-| **Admin Categorías** — ABM de categorías | `POST /api/categories`, `PUT /api/categories[/{id}]`, `DELETE /api/categories/{id}`, `GET /api/categories[/{id}]`; campos `name` + `description` | ✅ Implementado |
+| **Admin Categorías** — ABM de categorías | `POST /api/categories`, `PUT /api/categories[/{id}]`, `DELETE /api/categories/{id}`, `GET /api/categories[/{id}]`; campos `name` + `description` + `featured` | ✅ Implementado |
 | **Admin Resumen** — KPI "Stock bajo" (productos con menos de 5 unidades) | Los datos crudos existen (`GET /api/products` con filtro de cantidad), pero no hay endpoint de agregación ni filtro `quantityBelow` | ⚠️ `<a implementar>` |

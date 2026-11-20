@@ -46,9 +46,12 @@ public class CategoryController {
         return categoryService.update(categoryId, dto);
     }
 
+    /** GET /api/categories?featured=true&page=&size=&sort= — sin filtro, comportamiento previo. */
     @GetMapping
-    public Page<CategoryDto> findAll(Pageable pageable) {
-        return categoryService.findAll(pageable);
+    public Page<CategoryDto> findAll(
+            @RequestParam(required = false) Boolean featured,
+            Pageable pageable) {
+        return categoryService.findAll(featured, pageable);
     }
 
     @GetMapping("/paging")
@@ -65,9 +68,10 @@ public class CategoryController {
         return categoryService.findAllPagingAndSorting(pageNo, pageSize, sortBy);
     }
 
-    @GetMapping("/{categoryId}")
-    public CategoryDto findById(@PathVariable Long categoryId) {
-        return categoryService.findById(categoryId);
+    /** Acepta tanto el ID numérico histórico como el slug usado por el frontend. */
+    @GetMapping("/{categoryIdOrSlug}")
+    public CategoryDto findByIdOrSlug(@PathVariable String categoryIdOrSlug) {
+        return categoryService.findByIdOrSlug(categoryIdOrSlug);
     }
 
     @DeleteMapping("/{categoryId}")

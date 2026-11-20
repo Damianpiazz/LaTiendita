@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.latiendita.productService.category.dto.CategoryDto;
 import com.latiendita.productService.exception.CategoryNotFoundException;
 import com.latiendita.productService.exception.InvalidSortException;
+import com.latiendita.productService.product.ProductRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,9 @@ class CategoryServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private ProductRepository productRepository;
 
     @InjectMocks
     private CategoryService categoryService;

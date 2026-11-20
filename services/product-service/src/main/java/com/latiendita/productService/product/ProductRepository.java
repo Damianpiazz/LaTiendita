@@ -23,6 +23,8 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
     Page<ProductEntity> findByCategoryId(Long categoryId, Pageable pageable);
 
+    long countByCategoryId(Long categoryId);
+
     Page<ProductEntity> findByTitleContainingIgnoreCase(String title, Pageable pageable);
 
     Page<ProductEntity> findByCategoryIdAndTitleContainingIgnoreCase(
@@ -34,7 +36,7 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
      */
     @Query("""
             select p from ProductEntity p
-            where (:q is null or lower(p.title) like lower(concat('%', :q, '%')))
+            where (:q is null or lower(p.title) like lower(concat('%', cast(:q as string), '%')))
               and (:categoryId is null or p.categoryId = :categoryId)
               and (:featured is null or p.featured = :featured)
             """)
