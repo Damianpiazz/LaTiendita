@@ -18,9 +18,15 @@ const monthAbbreviations = [
   "dic",
 ];
 
-/** Formats an ISO date (`2026-10-12`) the way the wireframe shows it: `12 oct 2026`. */
+/**
+ * Formats an ISO date the way the wireframe shows it: `12 oct 2026`.
+ *
+ * The mock adapter sends a date-only value (`2026-10-12`) while review-service
+ * sends a full timestamp (`2026-11-18T13:43:52Z`). Both are accepted.
+ */
 export function formatReviewDate(isoDate: string): string {
-  const date = new Date(`${isoDate}T00:00:00Z`);
+  const hasTime = isoDate.includes("T");
+  const date = new Date(hasTime ? isoDate : `${isoDate}T00:00:00Z`);
 
   return `${date.getUTCDate()} ${monthAbbreviations[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
