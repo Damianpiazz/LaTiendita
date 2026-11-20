@@ -6,6 +6,9 @@ import {
   getProducts,
 } from "@/features/product/services/catalog.service";
 
+// The detail page depends on the requested slug and live catalog/review data.
+export const instant = false;
+
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
 };
