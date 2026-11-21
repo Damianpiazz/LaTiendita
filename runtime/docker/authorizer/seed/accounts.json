@@ -1,0 +1,6 @@
+[
+  { "email": "ana.prueba@latiendita.test", "givenName": "Ana", "familyName": "Pérez" },
+  { "email": "bruno.prueba@latiendita.test", "givenName": "Bruno", "familyName": "Díaz" },
+  { "email": "camila.prueba@latiendita.test", "givenName": "Camila", "familyName": "Torres" },
+  { "email": "diego.prueba@latiendita.test", "givenName": "Diego", "familyName": "Ruiz" }
+]
