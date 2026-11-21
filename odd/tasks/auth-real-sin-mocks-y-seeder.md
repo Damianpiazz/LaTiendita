@@ -28,7 +28,7 @@ S7 — Reporte del usuario (texto literal): "comopuedo saber la password de los 
 | T2 | S1, S4 | inline | GREEN | `17b6385` — `lib/customers/profile.test.ts` 2/2 y `features/customer/services/customer.service.test.ts` 3/3 (RED→GREEN); `<Suspense>` en `/mi-cuenta`; `npm run build` pasa en modo real. |
 | T3 | S5 | inline | GREEN | `013cf80` — `runtime/docker/authorizer/seed/` con 4 cuentas; `docker compose run --rm authorizer-seed` → 4/4 ready dos veces seguidas; sin secretos en logs. |
 | T4 | S6 | inline | GREEN | `ec932a1` + verificación final — vitest 58/58, lint 0 errores, tsc exit 0, build exit 0; smoke: Ana y Bruno ven su propio email/nombre y no el del otro, sin redirect; login inválido 401. |
-| T5 | S7 | inline | GREEN | (commit pendiente) — default `Password123!` en seeder/Compose/.env.example/docs; 4/4 cuentas borradas y recreadas; 4/4 login 200; `Password123` → 401. |
+| T5 | S7 | inline | GREEN | `a3f00ec` — default `Password123!` en seeder/Compose/.env.example/docs; 4/4 cuentas borradas y recreadas; 4/4 login 200; `Password123` → 401. |
 
 Estrategia `exception-ok` por trabajo directo en `main` sin PR. Las líneas autoras se registran al cerrar cada unidad.
 
