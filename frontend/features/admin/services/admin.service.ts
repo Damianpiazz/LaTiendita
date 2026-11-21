@@ -1,5 +1,3 @@
-import { cacheLife } from "next/cache";
-
 import { env } from "@/config/env";
 import type {
   AdminCategories,
@@ -14,9 +12,6 @@ import { httpClient } from "@/lib/http/client";
 
 /** Dashboard of the admin summary screen. */
 export async function getAdminSummary(): Promise<AdminSummary> {
-  "use cache";
-  cacheLife("hours");
-
   const { data } = await httpClient.get<AdminSummary>("/admin/summary");
 
   return data;
@@ -29,9 +24,6 @@ export async function getAdminSummary(): Promise<AdminSummary> {
  * page props, and every admin screen shares the same shell.
  */
 export async function getAdminNavigation(): Promise<AdminNavigationCounts> {
-  "use cache";
-  cacheLife("hours");
-
   const { data } = await httpClient.get<AdminNavigationCounts>("/admin/navigation");
 
   return data;
@@ -62,9 +54,6 @@ function unwrapPage<T>(payload: Page<T> | T[]): T[] {
  * both the admin toggle and the Home grid. Mock mode keeps the wireframe seed.
  */
 export async function getAdminCategories(): Promise<AdminCategories> {
-  "use cache";
-  cacheLife("hours");
-
   if (env.useMocks) {
     const { data } = await httpClient.get<AdminCategories>("/admin/categories");
 
@@ -91,9 +80,6 @@ export async function getAdminCategories(): Promise<AdminCategories> {
 
 /** Products table: visible page, store totals and the low-stock threshold. */
 export async function getAdminProducts(): Promise<AdminProducts> {
-  "use cache";
-  cacheLife("hours");
-
   const { data } = await httpClient.get<AdminProducts>("/admin/products");
 
   return data;
@@ -101,9 +87,6 @@ export async function getAdminProducts(): Promise<AdminProducts> {
 
 /** Orders table: visible page, store totals and the status tab counts. */
 export async function getAdminOrders(): Promise<AdminOrders> {
-  "use cache";
-  cacheLife("hours");
-
   const { data } = await httpClient.get<AdminOrders>("/admin/orders");
 
   return data;
@@ -111,9 +94,6 @@ export async function getAdminOrders(): Promise<AdminOrders> {
 
 /** Payments table: visible page, settlement totals and the period KPIs. */
 export async function getAdminPayments(): Promise<AdminPayments> {
-  "use cache";
-  cacheLife("hours");
-
   const { data } = await httpClient.get<AdminPayments>("/admin/payments");
 
   return data;
@@ -121,9 +101,6 @@ export async function getAdminPayments(): Promise<AdminPayments> {
 
 /** Clients table: visible page, store totals and the stats strip figures. */
 export async function getAdminClients(): Promise<AdminClients> {
-  "use cache";
-  cacheLife("hours");
-
   const { data } = await httpClient.get<AdminClients>("/admin/clients");
 
   return data;

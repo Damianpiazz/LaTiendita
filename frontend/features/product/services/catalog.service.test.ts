@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/cache", () => ({ cacheLife: vi.fn() }));
 
 import { httpClient } from "@/lib/http/client";
+import { mockAdapter } from "@/mocks";
 
 import {
   findCategoryBySlug,
@@ -177,29 +178,39 @@ describe("catalog service adapter", () => {
   });
 
   it("keeps the existing service functions working through the mock adapter", async () => {
-    expect((await getCategories({ featured: true })).map((item) => item.slug)).toEqual([
-      "tecnologia",
-      "hogar",
-      "ropa",
-      "deportes",
-      "juguetes",
-    ]);
+    // The default transport is real; opt this regression check into the mock
+    // adapter explicitly so it does not depend on the local .env.
+    const originalAdapter = httpClient.defaults.adapter;
+    httpClient.defaults.adapter = mockAdapter;
 
-    const featured = await getFeaturedProducts();
-    expect(featured).toHaveLength(8);
-    expect(featured[0]).toMatchObject({
-      name: "Auriculares inalámbricos",
-      price: 25999,
-    });
+    try {
+      expect((await getCategories({ featured: true })).map((item) => item.slug)).toEqual([
+        "tecnologia",
+        "hogar",
+        "ropa",
+        "deportes",
+        "juguetes",
+      ]);
 
-    expect((await getProducts()).length).toBeGreaterThan(featured.length);
-    expect((await getCategoryProducts("tecnologia")).every((item) => item.categoryId === "tecnologia")).toBe(true);
-    expect(await getRelatedProducts(3)).toHaveLength(3);
+      const featured = await getFeaturedProducts();
+      expect(featured).toHaveLength(8);
+      expect(featured[0]).toMatchObject({
+        name: "Auriculares inalámbricos",
+        price: 25999,
+      });
+      expect((await getProducts()).length).toBeGreaterThan(featured.length);
+      expect(
+        (await getCategoryProducts("tecnologia")).every((item) => item.categoryId === "tecnologia"),
+      ).toBe(true);
+      expect(await getRelatedProducts(3)).toHaveLength(3);
 
-    expect((await getCategoryBySlug("tecnologia")).name).toBe("Tecnología");
-    expect(await findCategoryBySlug("missing")).toBeNull();
+      expect((await getCategoryBySlug("tecnologia")).name).toBe("Tecnología");
+      expect(await findCategoryBySlug("missing")).toBeNull();
 
-    expect((await getProductBySlug("auriculares-inalambricos")).sku).toBe("0042");
-    expect(await findProductBySlug("missing")).toBeNull();
+      expect((await getProductBySlug("auriculares-inalambricos")).sku).toBe("0042");
+      expect(await findProductBySlug("missing")).toBeNull();
+    } finally {
+      httpClient.defaults.adapter = originalAdapter;
+    }
   });
 });
