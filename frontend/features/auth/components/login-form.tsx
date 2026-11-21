@@ -1,20 +1,48 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 
 import { AuthField } from "@/features/auth/components/auth-field";
 import { AuthFooter } from "@/features/auth/components/auth-footer";
 import { AuthSubmit } from "@/features/auth/components/auth-submit";
+import { login } from "@/features/auth/services/auth.service";
+import { SESSION_EVENT } from "@/lib/auth/session";
 
 /**
- * Login form of the `Login Wireframe` frame.
- *
- * The frame defines no submit target and no error state, so the fields are
- * native and presentational; `¿Olvidaste tu contraseña?` is a real link because
- * the recovery screen exists.
+ * Login form of the `Login Wireframe` frame, now wired to the real BFF.
+ * Copy and spacing stay identical; errors are the only added state.
  */
 export function LoginForm() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    const fields = new FormData(event.currentTarget);
+    const email = String(fields.get("email") ?? "").trim();
+    const password = String(fields.get("password") ?? "");
+
+    try {
+      await login(email, password);
+      window.dispatchEvent(new Event(SESSION_EVENT));
+      router.push("/carrito");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo iniciar sesión");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <>
-      <form className="flex flex-col gap-4">
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <AuthField
           id="login-email"
           name="email"
@@ -40,9 +68,19 @@ export function LoginForm() {
             ¿Olvidaste tu contraseña?
           </Link>
         </div>
-      </form>
 
-      <AuthSubmit label="Ingresar" />
+        {error ? (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        ) : null}
+
+        <AuthSubmit
+          label={submitting ? "Ingresando..." : "Ingresar"}
+          type="submit"
+          disabled={submitting}
+        />
+      </form>
 
       <AuthFooter
         prompt="¿No tenés cuenta?"

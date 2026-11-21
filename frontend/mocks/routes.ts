@@ -14,6 +14,7 @@ import { productDetails } from "./data/product-details";
 import { products } from "./data/products";
 import { getReviewSummaryMock, getReviewsMock } from "./data/reviews";
 import { shippingMethods } from "./data/shipping";
+import { mockAuth } from "./data/auth";
 
 function readFeatured(searchParams: URLSearchParams): boolean | undefined {
   const value = searchParams.get("featured");
@@ -48,6 +49,39 @@ type CategoryUpdate = {
  * services do not change when `NEXT_PUBLIC_USE_MOCKS` is turned off.
  */
 export const mockRoutes: MockRoute[] = [
+  {
+    method: "POST",
+    path: "/api/auth/login",
+    handler: () => ({ user: mockAuth.login() }),
+  },
+  {
+    method: "POST",
+    path: "/api/auth/signup",
+    handler: () => ({ user: mockAuth.login() }),
+  },
+  {
+    method: "POST",
+    path: "/api/auth/forgot-password",
+    handler: () => ({
+      message:
+        "If an account exists for this email, a password reset link has been sent. Please check your inbox.",
+    }),
+  },
+  {
+    method: "POST",
+    path: "/api/auth/skip-mfa",
+    handler: () => ({ user: mockAuth.login() }),
+  },
+  {
+    method: "POST",
+    path: "/api/auth/logout",
+    handler: () => mockAuth.logout(),
+  },
+  {
+    method: "GET",
+    path: "/api/auth/session",
+    handler: () => mockAuth.session(),
+  },
   {
     method: "GET",
     path: "/admin/summary",

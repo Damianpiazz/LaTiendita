@@ -1,19 +1,60 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+
 import { AuthField } from "@/features/auth/components/auth-field";
 import { AuthFooter } from "@/features/auth/components/auth-footer";
 import { AuthSubmit } from "@/features/auth/components/auth-submit";
+import { signup } from "@/features/auth/services/auth.service";
+import { SESSION_EVENT } from "@/lib/auth/session";
 
 /**
- * Registration form of the `Register Wireframe` frame.
- *
- * Fields are native and presentational, like the rest of the mock: the design
- * defines no submit target and no error state. The password rules sit under the
- * field as a hint instead of being validated, and the terms checkbox is drawn
- * as a 16px square with a 12px gap to its copy.
+ * Registration form of the `Register Wireframe` frame, wired to real signup.
+ * Copy, hint and 16px checkbox stay as drawn; errors are the only added state.
  */
 export function RegisterForm() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    const fields = new FormData(event.currentTarget);
+    const name = String(fields.get("name") ?? "").trim();
+    const email = String(fields.get("email") ?? "").trim();
+    const password = String(fields.get("password") ?? "");
+    const confirmation = String(fields.get("passwordConfirmation") ?? "");
+
+    if (!fields.get("terms")) {
+      setError("Debés aceptar los términos y condiciones");
+      return;
+    }
+
+    if (password !== confirmation) {
+      setError("Las contraseñas no coinciden");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await signup({ name, email, password });
+      window.dispatchEvent(new Event(SESSION_EVENT));
+      router.push("/carrito");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo crear la cuenta");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <>
-      <form className="flex flex-col gap-4">
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <AuthField
           id="register-name"
           name="name"
@@ -57,9 +98,19 @@ export function RegisterForm() {
             Acepto los términos y condiciones y la política de privacidad
           </span>
         </label>
-      </form>
 
-      <AuthSubmit label="Crear cuenta" />
+        {error ? (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        ) : null}
+
+        <AuthSubmit
+          label={submitting ? "Creando cuenta..." : "Crear cuenta"}
+          type="submit"
+          disabled={submitting}
+        />
+      </form>
 
       <AuthFooter
         prompt="¿Ya tenés cuenta?"
