@@ -16,7 +16,7 @@ const accounts = JSON.parse(readFileSync(join(here, "accounts.json"), "utf8"));
 
 const AUTHORIZER_URL = (process.env.AUTHORIZER_URL ?? "http://authorizer:8080").replace(/\/$/, "");
 const ORIGIN = process.env.SEED_ORIGIN ?? "http://localhost:3000";
-const PASSWORD = process.env.SEED_USER_PASSWORD ?? "Semilla123!";
+const PASSWORD = process.env.SEED_USER_PASSWORD ?? "Password123!";
 const TIMEOUT_MS = Number(process.env.SEED_TIMEOUT_MS ?? 10000);
 const ATTEMPTS = Number(process.env.SEED_ATTEMPTS ?? 3);
 

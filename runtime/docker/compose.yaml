@@ -127,7 +127,7 @@ services:
     environment:
       AUTHORIZER_URL: http://authorizer:8080
       SEED_ORIGIN: ${SEED_ORIGIN:-http://localhost:3000}
-      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-Semilla123!}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-Password123!}
     depends_on:
       authorizer:
         condition: service_healthy
