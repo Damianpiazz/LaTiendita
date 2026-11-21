@@ -31,9 +31,9 @@ S10 — Smoke real: usuario de prueba creado con `POST /api/auth/signup` (`clien
 | ID | Specs | Route | Status | Evidence |
 | --- | --- | --- | --- | --- |
 | T1 | S2, S3, S4, S6, S9 | inline | GREEN | 16/16 tests enfocados; `tsc --noEmit` limpio; lint 0 errores (1 warning preexistente en `shipment`); smoke real en T4; commit `e5ffd25` (BFF y helpers) |
-| T2 | S3, S5, S7, S9 | inline | GREEN | RED 6 fallos; implementado `signup` + ruta `signup` + `RegisterForm` con términos/confirmación; 5 archivos/15 tests |
-| T3 | S3, S8, S9 | inline | GREEN | RED 4 fallos + suite sin módulo; implementada ruta `forgot-password` + `requestPasswordReset` + `PasswordRecoveryForm` + mock; 3 archivos/13 tests |
-| T4 | S1, S10 | inline | GREEN | smoke real: forgot 200, login bad 401, signup MFA, skip-mfa JWT httpOnly, sesión, logout; sin token en HTML |
+| T2 | S3, S5, S7, S9 | inline | GREEN | RED 6 fallos; implementado `signup` + ruta `signup` + `RegisterForm` con términos/confirmación; 5 archivos/15 tests; commit `bc998ce` |
+| T3 | S3, S8, S9 | inline | GREEN | RED 4 fallos + suite sin módulo; implementada ruta `forgot-password` + `requestPasswordReset` + `PasswordRecoveryForm` + mock; 3 archivos/13 tests; commit `bc998ce` |
+| T4 | S1, S10 | inline | GREEN | smoke real: forgot 200, login bad 401, signup MFA, skip-mfa JWT httpOnly, sesión, logout; sin token en HTML; commit `bc998ce` |
 
 Forecast de líneas autoras: ~520 (T1 ~240, T2 ~140, T3 ~90, T4 ~50); estrategia `exception-ok` por trabajo directo en `main`. Esta feature desbloquea T1 del carrito.
 
@@ -49,4 +49,5 @@ L1 (verbatim): "Mira primero Implementame la integracion de las pantallas Login 
 - 2026-11-20, T2: RED con 6 fallos (ruta sin módulo, servicio y form). `signup` divide `Nombre y apellido` en `given_name`/`family_name`, envía `confirm_password` y `roles: ["cliente"]`, propaga el error real de política de contraseña y conserva las cookies MFA. `RegisterForm` valida términos y coincidencia de contraseñas. GREEN: 5 archivos/15 tests.
 - 2026-11-20, T3: RED con 4 fallos (ruta sin módulo, servicio y form). Ruta `forgot-password` reenvía `Origin` a `/api/auth/forgot_password` y devuelve el mensaje real; `requestPasswordReset` usa `baseURL: ""`; `PasswordRecoveryForm` muestra el mensaje en `role="status"` y errores en `role="alert"`, conservando la nota de spam; mock agregado. GREEN: 3 archivos/13 tests.
 - 2026-11-20, verificación global: `npx vitest run` → 19 archivos/50 tests; `npm run lint` → 0 errores (1 warning preexistente en `shipment`); `npx tsc --noEmit` limpio; `npm run build` correcto (Next 16.4.5, 68 páginas estáticas, rutas `/api/auth/*` dinámicas).
+- 2026-11-20, entrega: dos work units en `main`, `e5ffd25` (BFF y helpers de sesión) y `bc998ce` (forms, servicios, mocks, header y esta spec). Sin push: lo hace el usuario. `docs/OpenPencil/LaTiendita.fig` quedó fuera de ambos commits.
 - 2026-11-20, T4 smoke real (servidor aislado con `NEXT_PUBLIC_USE_MOCKS=false`, `NEXT_PUBLIC_API_URL=http://localhost:8081`, puerto 3100 y `Origin` permitido `http://localhost:3000`): forgot-password → 200 con mensaje real de Authorizer; login con password inválida → 401 "Email o contraseña incorrectos"; signup de usuario desechable → 200 `mfaRequired` con cookies `mfa_session`; skip-mfa → 200 con `lt_access_token` HttpOnly; login posterior → 200 con cookie HttpOnly; `/api/auth/session` → autenticado; HTML público sin `lt_access_token` ni JWT; logout → 200 y sesión desautenticada. El build de producción con mocks desactivados falla al prerenderizar `/admin` y `/mi-cuenta` (401 preexistentes), por lo que el smoke se hizo en modo dev. Config temporal (`distDir`, includes de tsconfig) revertida. No se registran contraseñas ni JWT en documentos.
