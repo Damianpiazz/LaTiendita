@@ -22,10 +22,10 @@ S6 — Verificación: `npx vitest run`, `npm run lint`, `npx tsc --noEmit`, `npm
 
 | ID | Specs | Route | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| T1 | S2, S3 | inline | GREEN | `config/env.test.ts` 3/3 (RED 1→GREEN 3); `.env` y `.env.example` con modo real; default invertido en `config/env.ts`. |
-| T2 | S1, S4 | inline | GREEN | `lib/customers/profile.test.ts` 2/2 y `features/customer/services/customer.service.test.ts` 3/3 (RED→GREEN); `<Suspense>` en `/mi-cuenta`; `npm run build` pasa en modo real. |
-| T3 | S5 | inline | GREEN | `runtime/docker/authorizer/seed/` con 4 cuentas; `docker compose run --rm authorizer-seed` → 4/4 ready dos veces seguidas; sin secretos en logs. |
-| T4 | S6 | inline | GREEN | vitest 58/58, lint 0 errores, tsc exit 0, build exit 0; smoke: Ana y Bruno ven su propio email/nombre y no el del otro, sin redirect; login inválido 401. |
+| T1 | S2, S3 | inline | GREEN | `fe111af` — `config/env.test.ts` 3/3 (RED 1→GREEN 3); `.env` y `.env.example` con modo real; default invertido en `config/env.ts`. |
+| T2 | S1, S4 | inline | GREEN | `17b6385` — `lib/customers/profile.test.ts` 2/2 y `features/customer/services/customer.service.test.ts` 3/3 (RED→GREEN); `<Suspense>` en `/mi-cuenta`; `npm run build` pasa en modo real. |
+| T3 | S5 | inline | GREEN | `013cf80` — `runtime/docker/authorizer/seed/` con 4 cuentas; `docker compose run --rm authorizer-seed` → 4/4 ready dos veces seguidas; sin secretos en logs. |
+| T4 | S6 | inline | GREEN | `ec932a1` + verificación final — vitest 58/58, lint 0 errores, tsc exit 0, build exit 0; smoke: Ana y Bruno ven su propio email/nombre y no el del otro, sin redirect; login inválido 401. |
 
 Estrategia `exception-ok` por trabajo directo en `main` sin PR. Las líneas autoras se registran al cerrar cada unidad.
 
@@ -47,3 +47,4 @@ L3 (verbatim, 2026-11-20): "Yo quiero que al levantar authorizer tenga cuentas y
 - 2026-11-20: el smoke real estaba bloqueado porque `customer-service` no estaba corriendo en el stack levantado (gateway devolvía 500 en `/api/customers/me`). Se levantó el servicio, quedó healthy y el endpoint respondió 404 (perfil aún no creado), que es el caso que `getCustomerProfile()` aprovisiona con `POST /api/customers`.
 - 2026-11-20: el host quedó con 0.9 GB libres de 5.9 GB (8 contenedores Java + dos servidores Next + Chrome + VS Code), lo que degradó logs/red de Docker y causó timeouts. Se detuvo el `next dev` redundante del puerto 3000 para liberar memoria; el gateway volvió a responder.
 - 2026-11-21: smoke end-to-end OK con `curl.exe` (Invoke-WebRequest de PowerShell mangled el Cookie header JWT): Ana ve `ana.prueba@latiendita.test` y "Ana", no ve los datos de Bruno; Bruno ve `bruno.prueba@latiendita.test` y "Bruno", no ve los de Ana; ningún `NEXT_REDIRECT`; login inválido → 401. T4 GREEN.
+- 2026-11-21: trabajo entregado en cuatro commits en `main` (`fe111af`, `17b6385`, `ec932a1`, `013cf80`), sin push; `docs/OpenPencil/LaTiendita.fig` se dejó fuera a propósito. RDD assessment dio `high_risk` por el hot path de auth; el usuario eligió "Omitir esta vez" y el decline fue candidate-scoped, sin crear registro de revisión.
