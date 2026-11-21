@@ -1,24 +1,19 @@
 import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
-import { getCustomerProfile } from "@/features/customer/services/customer.service";
+import { SiteHeaderSession } from "@/components/layout/site-header-session";
 
 /**
- * Customer account shell: the public header and footer, with the header showing
- * the signed-in control instead of the `Ingresar` link.
- *
- * The initials come from the profile endpoint because a layout never receives
- * the page data, the same reason the admin layout reads its own counters.
+ * Customer account shell: the public header and footer, with the header chip
+ * following the real session on the client. Reading the session here instead
+ * of in the layout keeps the route prerenderable under Cache Components.
  */
-export default async function AccountLayout({
+export default function AccountLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const profile = await getCustomerProfile();
-
   return (
     <div className="flex min-h-dvh flex-col bg-wf-canvas">
-      <SiteHeader account={{ initials: profile.initials, label: "Mi cuenta" }} />
+      <SiteHeaderSession />
       <main className="flex-1">{children}</main>
       <SiteFooter />
     </div>
