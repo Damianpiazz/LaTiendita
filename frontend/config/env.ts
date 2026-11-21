@@ -17,8 +17,8 @@ function readBoolean(value: string | undefined, fallback: boolean): boolean {
 export const env = {
   apiBaseUrl: process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_BASE_URL,
   /**
-   * Mock-first until the microservices are wired: every request goes through
-   * `mocks/` unless the flag is explicitly disabled.
+   * Real backend by default. Mock mode is an explicit opt-in for isolated
+   * tests; an absent or empty flag never enables it.
    */
-  useMocks: readBoolean(process.env.NEXT_PUBLIC_USE_MOCKS, true),
+  useMocks: readBoolean(process.env.NEXT_PUBLIC_USE_MOCKS, false),
 } as const;
