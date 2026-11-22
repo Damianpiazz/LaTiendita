@@ -24,10 +24,17 @@ vi.mock("@/config/env", () => ({
 import { httpClient } from "@/lib/http/client";
 
 import {
+  ADMIN_ORDERS_DEFAULT_SORT,
+  ADMIN_ORDERS_PAGE_SIZE,
+  ADMIN_PAYMENTS_DEFAULT_SORT,
+  ADMIN_PAYMENTS_PAGE_SIZE,
+  ADMIN_PAYMENTS_RANGE_DAYS,
   ADMIN_PRODUCTS_DEFAULT_SORT,
   ADMIN_PRODUCTS_PAGE_SIZE,
   getAdminCategories,
   getAdminNavigation,
+  getAdminOrders,
+  getAdminPayments,
   getAdminProducts,
   getAdminSummary,
 } from "./admin.service";
@@ -50,7 +57,7 @@ describe("admin.service", () => {
     mockState.token = "test-token";
   });
 
-  it("reads the real catalog and maps it to the admin rows in real mode", async () => {
+  it("sends the bearer token and maps a Spring page of categories", async () => {
     const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () =>
       response({
         content: [
@@ -60,48 +67,74 @@ describe("admin.service", () => {
             description: "Artículos del hogar",
             slug: "hogar",
             featured: true,
+            active: false,
+            imageUrl: "/images/hogar.jpg",
             productCount: 18,
+            lowStockCount: 4,
           },
         ],
+        totalElements: 9,
       }) as never,
     );
 
     const result = await getAdminCategories();
 
-    expect(get).toHaveBeenCalledWith("/api/categories");
-    expect(result.items[0]).toMatchObject({
-      id: "7",
-      name: "Hogar",
-      slug: "hogar",
-      featured: true,
-      productCount: 18,
+    expect(get).toHaveBeenCalledWith("/api/categories", {
+      params: { page: 0, sort: "name,asc" },
+      headers: { Authorization: "Bearer test-token" },
     });
+    expect(result.items).toEqual([
+      {
+        id: "7",
+        name: "Hogar",
+        slug: "hogar",
+        description: "Artículos del hogar",
+        productCount: 18,
+        lowStockCount: 4,
+        featured: true,
+        active: false,
+        imageUrl: "/images/hogar.jpg",
+      },
+    ]);
     expect(result.selectedId).toBe("7");
+    expect(result.total).toBe(9);
   });
 
-  it("keeps the wireframe seed in mock mode for categories", async () => {
+  it("forwards q, featured, sort and pagination with a 0-based page index", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () =>
+      response({ content: [], totalElements: 0 }) as never,
+    );
+
+    await getAdminCategories({
+      q: "remer",
+      featured: true,
+      page: 3,
+      size: 6,
+      sort: "name,desc",
+    });
+
+    expect(get).toHaveBeenCalledWith("/api/categories", {
+      params: {
+        q: "remer",
+        featured: true,
+        page: 2,
+        size: 6,
+        sort: "name,desc",
+      },
+      headers: { Authorization: "Bearer test-token" },
+    });
+  });
+
+  it("never falls back to the mock categories route", async () => {
     mockState.useMocks = true;
-    const seed = {
-      items: [
-        {
-          id: "remeras",
-          name: "Remeras",
-          slug: "remeras",
-          description: "Remeras, polos y remerones.",
-          productCount: 14,
-          lowStockCount: 3,
-          featured: true,
-        },
-      ],
-      selectedId: "remeras",
-      updatedLabel: "hoy 09:12",
-    };
-    const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () => response(seed) as never);
+    const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () =>
+      response({ content: [], totalElements: 0 }) as never,
+    );
 
-    const result = await getAdminCategories();
+    await getAdminCategories();
 
-    expect(get).toHaveBeenCalledWith("/admin/categories");
-    expect(result).toEqual(seed);
+    expect(get).toHaveBeenCalledWith("/api/categories", expect.anything());
+    expect(get).not.toHaveBeenCalledWith("/admin/categories");
   });
 
   it("composes admin summary from real backend endpoints", async () => {
@@ -356,5 +389,260 @@ describe("admin.service", () => {
     });
     expect(get).not.toHaveBeenCalledWith("/admin/products");
     expect(result.items).toEqual([]);
+  });
+
+  it("reads real admin orders with stats, auth and 0-based page", async () => {
+    mockState.useMocks = true;
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/orders/admin") {
+        return response({
+          content: [
+            {
+              id: 1042,
+              orderNumber: "ORD-1042",
+              customerId: "customer-9",
+              customerEmail: "lucia@mail.com",
+              paymentMethod: null,
+              status: "PENDING",
+              total: "45998.00",
+              itemCount: 3,
+              createdAt: "2026-11-10T12:42:00Z",
+            },
+          ],
+        }) as never;
+      }
+      if (url === "/api/orders/admin/stats") {
+        return response({
+          totalOrders: 48,
+          pendingDispatch: 12,
+          cancelledInPeriod: 2,
+          statusCounts: {
+            todos: 48,
+            pendiente: 12,
+            pagado: 8,
+            enviado: 5,
+            entregado: 21,
+            cancelado: 2,
+          },
+        }) as never;
+      }
+      if (url === "/api/payments/order/1042") {
+        return response({ provider: "MERCADO_PAGO" }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const result = await getAdminOrders({ status: "pendiente", page: 2, q: "1042" });
+
+    expect(ADMIN_ORDERS_PAGE_SIZE).toBe(8);
+    expect(ADMIN_ORDERS_DEFAULT_SORT).toBe("createdAt,desc");
+    expect(get).toHaveBeenCalledWith("/api/orders/admin", {
+      params: { page: 1, size: 8, sort: "createdAt,desc", q: "1042", status: "PENDING" },
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(get).toHaveBeenCalledWith("/api/orders/admin/stats", {
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(get).not.toHaveBeenCalledWith("/admin/orders");
+    expect(result.totalOrders).toBe(48);
+    expect(result.statusCounts.pendiente).toBe(12);
+    expect(result.items[0]).toMatchObject({
+      id: "#1042",
+      customer: "customer-9",
+      email: "lucia@mail.com",
+      payment: "mercado-pago",
+      status: "pendiente",
+      itemCount: 3,
+    });
+  });
+
+  it("reads the real payments page with bearer auth, a 0-based page and mapped rows", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/payments/admin") {
+        return response({
+          content: [
+            {
+              id: 812,
+              orderNumber: "ORD-1042",
+              customerId: "user-1",
+              provider: "MERCADO_PAGO",
+              paymentMethodId: "visa",
+              paymentType: "credit_card",
+              paidAt: "2026-11-10T12:42:00Z",
+              amount: "45998.00",
+              status: "PENDING",
+            },
+          ],
+          totalElements: 48,
+          totalPages: 6,
+          size: 8,
+          number: 1,
+        }) as never;
+      }
+      if (url === "/api/payments/admin/summary") {
+        return response({
+          paymentsToClear: 86400,
+          paymentsInReview: 11,
+          totalPayments: 48,
+          approvedCount: 34,
+          pendingCount: 11,
+          rejectedCount: 3,
+          approvedVolume: 1284950,
+          pendingVolume: 412370,
+          rejectedVolume: 67994,
+          approvalRate: 91,
+          approvalAttempts: 37,
+          rangeDays: 30,
+        }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const result = await getAdminPayments({
+      q: "1042",
+      status: "pendiente",
+      page: 2,
+      size: 8,
+      sort: "amount,desc",
+    });
+
+    expect(get).toHaveBeenCalledWith("/api/payments/admin", {
+      params: {
+        q: "1042",
+        status: "PENDING",
+        page: 1,
+        size: 8,
+        sort: "amount,desc",
+        days: 30,
+      },
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(get).toHaveBeenCalledWith("/api/payments/admin/summary", {
+      params: { days: 30 },
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(get).not.toHaveBeenCalledWith("/admin/payments");
+    expect(result.items).toEqual([
+      {
+        id: "#812",
+        orderId: "#1042",
+        customer: "user-1",
+        provider: "Mercado Pago",
+        method: "Tarjeta de crédito · Visa",
+        paidAt: "10/11 · 09:42",
+        amount: 45998,
+        status: "pendiente",
+      },
+    ]);
+    expect(result).toMatchObject({
+      pageSize: 8,
+      totalPayments: 48,
+      approvedCount: 34,
+      pendingCount: 11,
+      rejectedCount: 3,
+      approvalRate: 91,
+      approvalAttempts: 37,
+      rangeLabel: "Últimos 30 días",
+    });
+  });
+
+  it("uses the wireframe page size, sort and 30-day range by default even in mock mode", async () => {
+    mockState.useMocks = true;
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/payments/admin") {
+        return response({ content: [] }) as never;
+      }
+      if (url === "/api/payments/admin/summary") {
+        return response({
+          paymentsToClear: 0,
+          paymentsInReview: 0,
+          totalPayments: 0,
+          approvedCount: 0,
+          pendingCount: 0,
+          rejectedCount: 0,
+          approvedVolume: 0,
+          pendingVolume: 0,
+          rejectedVolume: 0,
+          approvalRate: 0,
+          approvalAttempts: 0,
+          rangeDays: 30,
+        }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const result = await getAdminPayments();
+
+    expect(ADMIN_PAYMENTS_PAGE_SIZE).toBe(8);
+    expect(ADMIN_PAYMENTS_DEFAULT_SORT).toBe("paidAt,desc");
+    expect(ADMIN_PAYMENTS_RANGE_DAYS).toBe(30);
+    expect(get).toHaveBeenCalledWith("/api/payments/admin", {
+      params: { page: 0, size: 8, sort: "paidAt,desc", days: 30 },
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(get).not.toHaveBeenCalledWith("/admin/payments");
+    expect(result.items).toEqual([]);
+  });
+
+  it("preserves the admin products bearer and 0-based page after adding the payments adapter", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/products/admin") {
+        return response({ content: [] }) as never;
+      }
+      if (url === "/api/products/admin/summary") {
+        return response({
+          totalProducts: 0,
+          totalCategories: 0,
+          totalLowStock: 0,
+          lowStockThreshold: 5,
+        }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const result = await getAdminProducts({ page: 3, status: "publicado" });
+
+    expect(get).toHaveBeenCalledWith("/api/products/admin", {
+      params: { page: 2, size: 8, sort: "id,desc", status: "publicado" },
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(result.items).toEqual([]);
+  });
+
+  it("regression: clients work keeps the products bearer and 0-based page", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/products/admin") {
+        return response({ content: [] }) as never;
+      }
+      if (url === "/api/products/admin/summary") {
+        return response({
+          totalProducts: 0,
+          totalCategories: 0,
+          totalLowStock: 0,
+          lowStockThreshold: 5,
+        }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    await getAdminProducts({ page: 4, size: 8 });
+
+    expect(get).toHaveBeenCalledWith("/api/products/admin", {
+      params: { page: 3, size: 8, sort: "id,desc" },
+      headers: { Authorization: "Bearer test-token" },
+    });
+  });
+
+  it("regression: clients work keeps the categories bearer and 0-based page", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () =>
+      response({ content: [], totalElements: 0 }) as never,
+    );
+
+    await getAdminCategories({ page: 3, q: "remer" });
+
+    expect(get).toHaveBeenCalledWith("/api/categories", {
+      params: { page: 2, sort: "name,asc", q: "remer" },
+      headers: { Authorization: "Bearer test-token" },
+    });
   });
 });

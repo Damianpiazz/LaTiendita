@@ -1,4 +1,6 @@
-import type { AdminOrderStatus, AdminOrders } from "@/features/admin/types";
+"use client";
+
+import type { AdminOrderStatus, AdminOrderStatusFilter, AdminOrders } from "@/features/admin/types";
 import { cn } from "@/lib/utils";
 
 const tabs: { status: "todos" | AdminOrderStatus; label: string }[] = [
@@ -10,24 +12,27 @@ const tabs: { status: "todos" | AdminOrderStatus; label: string }[] = [
   { status: "cancelado", label: "Cancelados" },
 ];
 
-/**
- * Status tabs and the period control above the orders table.
- *
- * Counts come from the endpoint's status totals, so they keep summing to the
- * store total. `Todos` is the drawn active tab, and the period control is
- * presentational because the frame draws no menu for it.
- */
-export function AdminOrdersFilters({ orders }: { orders: AdminOrders }) {
+type Props = {
+  orders: AdminOrders;
+  status: AdminOrderStatusFilter;
+  onStatusChange: (status: AdminOrderStatusFilter) => void;
+};
+
+/** Status tabs and the period control above the orders table. */
+export function AdminOrdersFilters({ orders, status, onStatusChange }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-2">
         {tabs.map((tab) => {
-          const active = tab.status === "todos";
+          const value: AdminOrderStatusFilter = tab.status === "todos" ? "all" : tab.status;
+          const active = value === status;
 
           return (
-            <span
+            <button
               key={tab.status}
+              type="button"
               aria-current={active ? "true" : undefined}
+              onClick={() => onStatusChange(value)}
               className={cn(
                 "flex h-10 items-center gap-2 rounded-full px-4 text-sm",
                 active
@@ -44,7 +49,7 @@ export function AdminOrdersFilters({ orders }: { orders: AdminOrders }) {
               >
                 {orders.statusCounts[tab.status]}
               </span>
-            </span>
+            </button>
           );
         })}
       </div>

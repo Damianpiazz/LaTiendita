@@ -33,3 +33,13 @@ export type AdminOrders = {
   /** e.g. `Últimos 30 días`; display string because the mock has no clock. */
   rangeLabel: string;
 };
+
+export type AdminOrderStatusFilter = "all" | AdminOrderStatus;
+
+export type AdminOrdersQuery = {
+  q?: string;
+  status?: AdminOrderStatusFilter;
+  page?: number;
+  size?: number;
+  sort?: string;
+};

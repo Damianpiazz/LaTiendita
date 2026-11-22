@@ -1,3 +1,5 @@
+"use client";
+
 import { StatusBadge } from "@/features/admin/components/status-badge";
 import type { AdminOrders, AdminPaymentMethod } from "@/features/admin/types";
 import { formatPrice } from "@/features/product/helpers/format-price";
@@ -8,13 +10,16 @@ const paymentLabels: Record<AdminPaymentMethod, string> = {
   efectivo: "Efectivo",
 };
 
-/**
- * Orders card: header with search and sort, the 40px head and eight 64px rows.
- *
- * Column widths are the frame's; the wrapper scrolls sideways under 1096px.
- * The status pill reuses the five-state `StatusBadge` of the summary screen.
- */
-export function AdminOrdersTable({ orders }: { orders: AdminOrders }) {
+type Props = {
+  orders: AdminOrders;
+  q: string;
+  loading: boolean;
+  loadError: string | null;
+  onSearchChange: (value: string) => void;
+};
+
+/** Orders card: header with search and sort, 40px head and 64px rows. */
+export function AdminOrdersTable({ orders, q, loading, loadError, onSearchChange }: Props) {
   return (
     <section className="overflow-hidden rounded-wf-md border border-wf-line bg-wf-surface">
       <div className="flex flex-wrap items-center justify-between gap-4 p-5">
@@ -37,8 +42,11 @@ export function AdminOrdersTable({ orders }: { orders: AdminOrders }) {
             <input
               id="admin-orders-search"
               type="search"
+              value={q}
+              disabled={loading}
+              onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Buscar por pedido, cliente o email..."
-              className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
+              className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder disabled:opacity-60"
             />
           </div>
           <span className="text-sm font-medium text-wf-ink-secondary">
@@ -46,6 +54,12 @@ export function AdminOrdersTable({ orders }: { orders: AdminOrders }) {
           </span>
         </div>
       </div>
+
+      {loadError ? (
+        <p className="px-5 pb-4 text-sm text-red-600" role="alert">
+          {loadError}
+        </p>
+      ) : null}
 
       <div className="overflow-x-auto">
         <div role="table" aria-label="Pedidos" className="min-w-[1096px]">
