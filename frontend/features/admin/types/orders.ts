@@ -4,7 +4,8 @@ import type { AdminOrderStatus } from "./dashboard";
 export type AdminPaymentMethod =
   | "mercado-pago"
   | "transferencia"
-  | "efectivo";
+  | "efectivo"
+  | "—";
 
 /** One row of the admin orders table. */
 export type AdminOrder = {

@@ -8,6 +8,7 @@ const paymentLabels: Record<AdminPaymentMethod, string> = {
   "mercado-pago": "Mercado Pago",
   transferencia: "Transferencia",
   efectivo: "Efectivo",
+  "—": "—",
 };
 
 type Props = {

@@ -43,17 +43,12 @@ function shortOrderId(orderNumber: string, id: number): string {
 }
 
 export function mapPaymentMethod(value?: string | null): AdminPaymentMethod {
-  const normalized = (value ?? "").toLowerCase();
+  const normalized = (value ?? "").toLowerCase().trim();
+  if (!normalized) return "—";
   if (normalized.includes("transfer")) return "transferencia";
   if (normalized.includes("efectivo") || normalized.includes("cash")) return "efectivo";
-  if (
-    normalized.includes("mercado") ||
-    normalized.includes("mp") ||
-    normalized === ""
-  ) {
-    return "mercado-pago";
-  }
-  return "mercado-pago";
+  if (normalized.includes("mercado") || normalized.includes("mp")) return "mercado-pago";
+  return "—";
 }
 
 export function mapAdminOrder(api: AdminOrderApi): AdminOrder {
