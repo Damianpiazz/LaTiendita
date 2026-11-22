@@ -1,15 +1,45 @@
+import type { AdminCategory, AdminProductStatusFilter } from "@/features/admin/types";
 import { cn } from "@/lib/utils";
 
-const filters = ["Todos", "Publicados", "Borradores", "Sin stock"];
+const statusFilters: { label: string; value: AdminProductStatusFilter }[] = [
+  { label: "Todos", value: "all" },
+  { label: "Publicados", value: "publicado" },
+  { label: "Borradores", value: "borrador" },
+  { label: "Sin stock", value: "agotado" },
+];
 
-/**
- * Toolbar of the products screen: search, the state filters and the
- * presentational category/sort selectors.
- *
- * `Todos` is the drawn active filter; the other three are outline pills. None
- * filters the table yet — the mock always serves the same page.
- */
-export function AdminProductsToolbar() {
+const sortOptions = [
+  { label: "Recientes ↓", value: "id,desc" },
+  { label: "Nombre ↑", value: "title,asc" },
+  { label: "Nombre ↓", value: "title,desc" },
+  { label: "Precio ↑", value: "price,asc" },
+  { label: "Precio ↓", value: "price,desc" },
+];
+
+type AdminProductsToolbarProps = {
+  categories: AdminCategory[];
+  search: string;
+  status: AdminProductStatusFilter;
+  categoryId: string;
+  sort: string;
+  onSearchChange: (value: string) => void;
+  onStatusChange: (value: AdminProductStatusFilter) => void;
+  onCategoryChange: (value: string) => void;
+  onSortChange: (value: string) => void;
+};
+
+/** Search, backend status pills and the category/sort selects. */
+export function AdminProductsToolbar({
+  categories,
+  search,
+  status,
+  categoryId,
+  sort,
+  onSearchChange,
+  onStatusChange,
+  onCategoryChange,
+  onSortChange,
+}: AdminProductsToolbarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -23,38 +53,72 @@ export function AdminProductsToolbar() {
           <input
             id="admin-products-search"
             type="search"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Buscar por nombre o SKU..."
             className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
           />
         </div>
 
-        {filters.map((filter, index) => (
-          <span
-            key={filter}
-            aria-current={index === 0 ? "true" : undefined}
-            className={cn(
-              "flex h-10 items-center rounded-full px-4 text-sm",
-              index === 0
-                ? "bg-wf-inverse font-medium text-wf-on-inverse"
-                : "border border-wf-line-strong bg-wf-surface text-wf-ink-secondary",
-            )}
-          >
-            {filter}
-          </span>
-        ))}
+        {statusFilters.map((filter) => {
+          const active = filter.value === status;
+
+          return (
+            <button
+              key={filter.value}
+              type="button"
+              aria-current={active ? "true" : undefined}
+              onClick={() => onStatusChange(filter.value)}
+              className={cn(
+                "flex h-10 items-center rounded-full px-4 text-sm transition-colors",
+                active
+                  ? "bg-wf-inverse font-medium text-wf-on-inverse"
+                  : "border border-wf-line-strong bg-wf-surface text-wf-ink-secondary hover:bg-wf-canvas",
+              )}
+            >
+              {filter.label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <span className="flex items-center gap-2 text-sm">
-          <span className="text-wf-ink-muted">Categoría:</span>
-          <span className="font-medium text-wf-ink">Todas</span>
-          <span aria-hidden className="text-wf-ink-placeholder">
-            ↓
-          </span>
-        </span>
-        <span className="text-sm font-medium text-wf-ink-secondary">
-          Ordenar: Recientes ↓
-        </span>
+        <div className="flex items-center gap-2 text-sm">
+          <label htmlFor="admin-products-category" className="text-wf-ink-muted">
+            Categoría
+          </label>
+          <select
+            id="admin-products-category"
+            value={categoryId}
+            onChange={(event) => onCategoryChange(event.target.value)}
+            className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-2 text-sm font-medium text-wf-ink"
+          >
+            <option value="">Todas</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <label htmlFor="admin-products-sort" className="text-wf-ink-muted">
+            Ordenar
+          </label>
+          <select
+            id="admin-products-sort"
+            value={sort}
+            onChange={(event) => onSortChange(event.target.value)}
+            className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-2 text-sm font-medium text-wf-ink-secondary"
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );

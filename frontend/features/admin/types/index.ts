@@ -17,6 +17,9 @@ export type {
 } from "./payments";
 export type {
   AdminProduct,
+  AdminProductPayload,
   AdminProducts,
   AdminProductStatus,
+  AdminProductStatusFilter,
+  AdminProductsQuery,
 } from "./products";

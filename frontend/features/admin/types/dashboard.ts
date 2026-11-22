@@ -62,11 +62,13 @@ export type AdminSummary = {
   paymentsInReview: number;
   /** Units that still count as healthy stock. */
   lowStockThreshold: number;
+  /** Total products under the low-stock threshold. */
+  lowStockTotal: number;
   /** Percent change of the week vs. the previous one. */
   weekDelta: number;
   weekOrders: number;
   salesByDay: AdminSalesDay[];
   recentOrders: AdminRecentOrder[];
-  lowStock: AdminLowStockProduct[];
-  activity: AdminActivityEntry[];
+  lowStockProducts: AdminLowStockProduct[];
+  recentActivity: AdminActivityEntry[];
 };

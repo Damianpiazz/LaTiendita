@@ -1,10 +1,19 @@
-/**
- * Bulk bar of the products screen.
- *
- * The frame always draws it with two selected rows, so the component renders
- * from the seed count instead of disappearing when nothing is selected.
- */
-export function AdminProductsBulkBar({ count }: { count: number }) {
+type AdminProductsBulkBarProps = {
+  count: number;
+  onPublish: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+  onClear: () => void;
+};
+
+/** Bulk bar of the products screen; always visible with the live count. */
+export function AdminProductsBulkBar({
+  count,
+  onPublish,
+  onArchive,
+  onDelete,
+  onClear,
+}: AdminProductsBulkBarProps) {
   return (
     <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 rounded-wf-md border border-wf-line-strong bg-wf-canvas px-5 py-2">
       <div className="flex items-center gap-3">
@@ -12,20 +21,34 @@ export function AdminProductsBulkBar({ count }: { count: number }) {
           {count}
         </span>
         <span className="text-sm font-medium text-wf-ink-secondary">
-          productos seleccionados
+          {count} productos seleccionados
         </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {["Publicar", "Archivar", "Eliminar"].map((action) => (
-          <span
-            key={action}
-            className="flex h-8 items-center rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-xs font-medium text-wf-ink-secondary"
+        {[
+          { label: "Publicar", onClick: onPublish },
+          { label: "Archivar", onClick: onArchive },
+          { label: "Eliminar", onClick: onDelete },
+        ].map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            onClick={action.onClick}
+            disabled={count === 0}
+            className="flex h-8 items-center rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-xs font-medium text-wf-ink-secondary transition-colors hover:bg-wf-canvas disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {action}
-          </span>
+            {action.label}
+          </button>
         ))}
-        <span className="px-1 text-xs text-wf-ink-muted">Limpiar</span>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={count === 0}
+          className="px-1 text-xs text-wf-ink-muted transition-colors hover:text-wf-ink disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Limpiar
+        </button>
       </div>
     </div>
   );

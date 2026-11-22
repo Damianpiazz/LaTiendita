@@ -9,11 +9,12 @@ import { formatPrice } from "@/features/product/helpers/format-price";
  * number of seeded low-stock rows.
  */
 export function KpiGrid({ summary }: { summary: AdminSummary }) {
+  const salesDeltaLabel = `${summary.salesDelta >= 0 ? "+" : ""}${formatDelta(summary.salesDelta)}% vs. ayer`;
   const cards = [
     {
       label: "Ventas de hoy",
       value: formatPrice(summary.salesToday),
-      meta: `+${formatDelta(summary.salesDelta)}% vs. ayer · ${summary.ordersToday} pedidos`,
+      meta: `${salesDeltaLabel} · ${summary.ordersToday} pedidos`,
     },
     {
       label: "Pedidos pendientes",
@@ -27,8 +28,8 @@ export function KpiGrid({ summary }: { summary: AdminSummary }) {
     },
     {
       label: "Stock bajo",
-      value: String(summary.lowStock.length),
-      meta: `productos con menos de ${summary.lowStockThreshold} u.`,
+      value: String(summary.lowStockTotal),
+      meta: `${summary.lowStockTotal} productos con menos de ${summary.lowStockThreshold} u.`,
     },
   ];
 

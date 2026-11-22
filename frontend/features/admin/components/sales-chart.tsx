@@ -62,6 +62,17 @@ export function SalesChart({ summary }: { summary: AdminSummary }) {
             </div>
           ))}
         </div>
+
+        <p className="flex items-center gap-3 text-sm text-wf-ink-secondary">
+          <span className="font-medium">
+            {formatPrice(ticket)} ticket promedio
+          </span>
+          <span className="text-wf-ink-faint">|</span>
+          <span>
+            {summary.weekDelta >= 0 ? "+" : ""}
+            {formatDelta(summary.weekDelta)}% vs. semana anterior
+          </span>
+        </p>
       </div>
     </section>
   );

@@ -81,38 +81,39 @@ export const adminSummary: AdminSummary = {
       total: 92498,
     },
   ],
-  lowStock: [
+  lowStockTotal: 5,
+  lowStockProducts: [
     { name: "Cinturón cuero café", sku: "CIN-CUE-CAF", quantity: 1 },
     { name: "Zapatillas runner blancas", sku: "ZAP-RUN-BLA", quantity: 2 },
     { name: "Remera básica blanca", sku: "REM-BAS-BLA", quantity: 3 },
     { name: "Buzo con capucha verde", sku: "BUZ-CAP-VER", quantity: 4 },
     { name: "Gorra clásica negra", sku: "GOR-CLA-NEG", quantity: 0 },
   ],
-  activity: [
+  recentActivity: [
     {
       id: "activity-order-1042",
       text: "Nuevo pedido #1042 — Lucía Fernández",
-      when: "Hace 12 min",
+      time: "Hace 12 min",
     },
     {
       id: "activity-payment-1041",
       text: "Pago acreditado #1041 — $ 129.999",
-      when: "Hace 27 min",
+      time: "Hace 27 min",
     },
     {
       id: "activity-stock-rem-bas-bla",
       text: "Stock actualizado — REM-BAS-BLA (3 u.)",
-      when: "Hace 1 h",
+      time: "Hace 1 h",
     },
     {
       id: "activity-cancel-1038",
       text: "Pedido cancelado #1038 — Ana Torres",
-      when: "Hace 2 h",
+      time: "Hace 2 h",
     },
     {
       id: "activity-product-gorra",
       text: "Producto publicado — Gorra clásica negra",
-      when: "Hace 4 h",
+      time: "Hace 4 h",
     },
   ],
 };
