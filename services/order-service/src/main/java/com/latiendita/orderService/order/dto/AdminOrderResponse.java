@@ -9,6 +9,8 @@ public record AdminOrderResponse(
         Long id,
         String orderNumber,
         String customerId,
+        String customerEmail,
+        String paymentMethod,
         OrderStatus status,
         BigDecimal total,
         int itemCount,

@@ -1,6 +1,7 @@
 package com.latiendita.orderService.order;
 
 import com.latiendita.orderService.order.dto.AdminOrderResponse;
+import com.latiendita.orderService.order.dto.AdminOrderStatsResponse;
 import com.latiendita.orderService.order.dto.AdminOrderSummaryResponse;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +23,18 @@ public class AdminOrderController {
 
     @GetMapping
     public Page<AdminOrderResponse> list(
+            @RequestParam(required = false) String q,
             @RequestParam(required = false) OrderStatus status,
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to,
             @PageableDefault(size = 20, sort = "createdAt",
                     direction = Sort.Direction.DESC) Pageable pageable) {
-        return adminOrderService.listForAdmin(status, from, to, pageable);
+        return adminOrderService.listForAdmin(q, status, from, to, pageable);
+    }
+
+    @GetMapping("/stats")
+    public AdminOrderStatsResponse stats() {
+        return adminOrderService.statsForAdmin();
     }
 
     @GetMapping("/summary")

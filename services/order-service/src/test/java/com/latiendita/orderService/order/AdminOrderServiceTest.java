@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.latiendita.orderService.exception.AdminRoleRequiredException;
 import com.latiendita.orderService.order.dto.AdminOrderResponse;
+import com.latiendita.orderService.order.dto.AdminOrderStatsResponse;
 import com.latiendita.orderService.order.dto.AdminOrderSummaryResponse;
 import com.latiendita.orderService.order.dto.AdminSalesDayResponse;
 import java.math.BigDecimal;
@@ -62,7 +63,7 @@ class AdminOrderServiceTest {
     void shouldRequireAdminRoleToListOrders() {
         setHeaders("customer-1", "cliente");
 
-        assertThatThrownBy(() -> adminOrderService.listForAdmin(null, null, null,
+        assertThatThrownBy(() -> adminOrderService.listForAdmin(null, null, null, null,
                 PageRequest.of(0, 20)))
                 .isInstanceOf(AdminRoleRequiredException.class);
         verifyNoInteractions(orderRepository);
@@ -84,7 +85,7 @@ class AdminOrderServiceTest {
                 .thenReturn(new PageImpl<>(List.of(order("customer-9", OrderStatus.PAID,
                         "120.00", NOW, 2))));
 
-        var page = adminOrderService.listForAdmin(OrderStatus.PAID, null, null, pageable);
+        var page = adminOrderService.listForAdmin(null, OrderStatus.PAID, null, null, pageable);
 
         assertThat(page.getTotalElements()).isEqualTo(1);
         AdminOrderResponse row = page.getContent().get(0);
@@ -103,12 +104,16 @@ class AdminOrderServiceTest {
                 .thenReturn(4L);
         when(orderRepository.countByStatusIn(List.of(OrderStatus.PENDING)))
                 .thenReturn(2L);
+        Instant previousWeekStart = today.minusDays(13).atStartOfDay(UTC).toInstant();
         when(orderRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 weekStart, tomorrow)).thenReturn(List.of(
                 order("c1", OrderStatus.PAID, "100.00", NOW, 1),
                 order("c2", OrderStatus.PENDING, "50.00", NOW, 2),
                 order("c3", OrderStatus.CANCELLED, "999.00", NOW, 3),
                 order("c4", OrderStatus.DELIVERED, "20.00", weekStart, 1)));
+        when(orderRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                previousWeekStart, weekStart)).thenReturn(List.of(
+                order("p1", OrderStatus.DELIVERED, "80.00", previousWeekStart, 1)));
         when(orderRepository.findTop5ByOrderByCreatedAtDesc())
                 .thenReturn(List.of(order("c1", OrderStatus.PAID, "100.00", NOW, 1)));
 
@@ -117,7 +122,10 @@ class AdminOrderServiceTest {
         assertThat(summary.pendingOrders()).isEqualTo(4L);
         assertThat(summary.pendingWithoutPayment()).isEqualTo(2L);
         assertThat(summary.salesToday()).isEqualByComparingTo("150.00");
+        assertThat(summary.salesYesterday()).isEqualByComparingTo("0.00");
         assertThat(summary.ordersToday()).isEqualTo(2L);
+        assertThat(summary.weekOrders()).isEqualTo(3L);
+        assertThat(summary.previousWeekSales()).isEqualByComparingTo("80.00");
         assertThat(summary.salesByDay()).hasSize(7);
         AdminSalesDayResponse first = summary.salesByDay().get(0);
         AdminSalesDayResponse last = summary.salesByDay().get(6);
@@ -129,6 +137,42 @@ class AdminOrderServiceTest {
         assertThat(last.orders()).isEqualTo(2L);
         assertThat(last.averageTicket()).isEqualByComparingTo("75.00");
         assertThat(summary.recentOrders()).hasSize(1);
+    }
+
+    @Test
+    void shouldRequireAdminRoleForStats() {
+        setHeaders("customer-1", "cliente");
+
+        assertThatThrownBy(() -> adminOrderService.statsForAdmin())
+                .isInstanceOf(AdminRoleRequiredException.class);
+        verifyNoInteractions(orderRepository);
+    }
+
+    @Test
+    void shouldComputeAdminStatsWithStatusCountsAndPeriodCancelled() {
+        LocalDate today = NOW.atZone(UTC).toLocalDate();
+        Instant periodStart = today.minusDays(29).atStartOfDay(UTC).toInstant();
+
+        when(orderRepository.count()).thenReturn(48L);
+        when(orderRepository.countByStatus(OrderStatus.PENDING)).thenReturn(12L);
+        when(orderRepository.countByStatus(OrderStatus.PAID)).thenReturn(8L);
+        when(orderRepository.countByStatus(OrderStatus.SHIPPED)).thenReturn(5L);
+        when(orderRepository.countByStatus(OrderStatus.DELIVERED)).thenReturn(21L);
+        when(orderRepository.countByStatus(OrderStatus.CANCELLED)).thenReturn(2L);
+        when(orderRepository.countByStatusAndCreatedAtGreaterThanEqual(
+                OrderStatus.CANCELLED, periodStart)).thenReturn(2L);
+
+        AdminOrderStatsResponse stats = adminOrderService.statsForAdmin();
+
+        assertThat(stats.totalOrders()).isEqualTo(48L);
+        assertThat(stats.pendingDispatch()).isEqualTo(20L);
+        assertThat(stats.cancelledInPeriod()).isEqualTo(2L);
+        assertThat(stats.statusCounts().todos()).isEqualTo(48L);
+        assertThat(stats.statusCounts().pendiente()).isEqualTo(12L);
+        assertThat(stats.statusCounts().pagado()).isEqualTo(8L);
+        assertThat(stats.statusCounts().enviado()).isEqualTo(5L);
+        assertThat(stats.statusCounts().entregado()).isEqualTo(21L);
+        assertThat(stats.statusCounts().cancelado()).isEqualTo(2L);
     }
 
     private void setHeaders(String userId, String roles) {

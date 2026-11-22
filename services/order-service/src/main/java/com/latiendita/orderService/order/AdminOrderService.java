@@ -2,6 +2,7 @@ package com.latiendita.orderService.order;
 
 import com.latiendita.orderService.CurrentUser;
 import com.latiendita.orderService.order.dto.AdminOrderResponse;
+import com.latiendita.orderService.order.dto.AdminOrderStatsResponse;
 import com.latiendita.orderService.order.dto.AdminOrderSummaryResponse;
 import com.latiendita.orderService.order.dto.AdminSalesDayResponse;
 import jakarta.persistence.criteria.Predicate;
@@ -33,11 +34,18 @@ public class AdminOrderService {
     private final OrderRepository orderRepository;
     private final Clock clock;
 
-    public Page<AdminOrderResponse> listForAdmin(OrderStatus status, Instant from, Instant to,
-                                                 Pageable pageable) {
+    public Page<AdminOrderResponse> listForAdmin(String q, OrderStatus status, Instant from,
+                                                 Instant to, Pageable pageable) {
         CurrentUser.requireAdmin();
         Specification<OrderEntity> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            String term = normalize(q);
+            if (term != null) {
+                String like = "%" + term.toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("orderNumber")), like),
+                        cb.like(cb.lower(root.get("customerId")), like)));
+            }
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
             }
@@ -50,6 +58,36 @@ public class AdminOrderService {
             return cb.and(predicates.toArray(Predicate[]::new));
         };
         return orderRepository.findAll(spec, pageable).map(AdminOrderService::toResponse);
+    }
+
+    private static String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public AdminOrderStatsResponse statsForAdmin() {
+        CurrentUser.requireAdmin();
+        long total = orderRepository.count();
+        long pending = orderRepository.countByStatus(OrderStatus.PENDING);
+        long paid = orderRepository.countByStatus(OrderStatus.PAID);
+        long shipped = orderRepository.countByStatus(OrderStatus.SHIPPED);
+        long delivered = orderRepository.countByStatus(OrderStatus.DELIVERED);
+        long cancelled = orderRepository.countByStatus(OrderStatus.CANCELLED);
+
+        Instant periodStart = LocalDate.now(clock).minusDays(29)
+                .atStartOfDay(ZoneOffset.UTC).toInstant();
+        long cancelledInPeriod = orderRepository.countByStatusAndCreatedAtGreaterThanEqual(
+                OrderStatus.CANCELLED, periodStart);
+
+        return new AdminOrderStatsResponse(
+                total,
+                pending + paid,
+                cancelledInPeriod,
+                new AdminOrderStatsResponse.StatusCounts(
+                        total, pending, paid, shipped, delivered, cancelled));
     }
 
     public AdminOrderSummaryResponse summaryForAdmin() {
@@ -83,6 +121,18 @@ public class AdminOrderService {
         }
 
         AdminSalesDayResponse todaySales = salesByDay.get(SUMMARY_DAYS - 1);
+        AdminSalesDayResponse yesterdaySales = salesByDay.get(SUMMARY_DAYS - 2);
+        long weekOrders = salesByDay.stream().mapToLong(AdminSalesDayResponse::orders).sum();
+
+        Instant previousWeekStart = today.minusDays((SUMMARY_DAYS * 2L) - 1L)
+                .atStartOfDay(ZoneOffset.UTC).toInstant();
+        BigDecimal previousWeekSales = orderRepository
+                .findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(previousWeekStart, weekStart)
+                .stream()
+                .filter(order -> order.getStatus() != OrderStatus.CANCELLED)
+                .map(OrderEntity::getTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         long pendingOrders = orderRepository.countByStatusIn(
                 List.of(OrderStatus.PENDING, OrderStatus.PAID));
         long pendingWithoutPayment = orderRepository.countByStatusIn(List.of(OrderStatus.PENDING));
@@ -91,8 +141,16 @@ public class AdminOrderService {
                 .map(AdminOrderService::toResponse)
                 .toList();
 
-        return new AdminOrderSummaryResponse(todaySales.total(), todaySales.orders(),
-                pendingOrders, pendingWithoutPayment, salesByDay, recentOrders);
+        return new AdminOrderSummaryResponse(
+                todaySales.total(),
+                yesterdaySales.total(),
+                todaySales.orders(),
+                pendingOrders,
+                pendingWithoutPayment,
+                weekOrders,
+                previousWeekSales,
+                salesByDay,
+                recentOrders);
     }
 
     private static AdminOrderResponse toResponse(OrderEntity order) {
@@ -100,6 +158,8 @@ public class AdminOrderService {
                 order.getId(),
                 order.getOrderNumber(),
                 order.getCustomerId(),
+                null,
+                null,
                 order.getStatus(),
                 order.getTotal(),
                 order.getItems().size(),
