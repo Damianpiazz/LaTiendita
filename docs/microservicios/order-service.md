@@ -24,6 +24,8 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://orderService:
 | `GET` | `/api/orders/admin` | Listado **global** de pedidos (filtros `q`, `status`, `from`, `to`) para el Admin Pedidos | — | `200` Page\<AdminOrderResponse\> | Sí (admin) |
 | `GET` | `/api/orders/admin/stats` | Totales y contadores por estado para la pantalla Admin Pedidos | — | `200` AdminOrderStatsResponse | Sí (admin) |
 | `GET` | `/api/orders/admin/summary` | KPIs del Admin Resumen derivados de `orders` | — | `200` AdminOrderSummaryResponse | Sí (admin) |
+| `GET` | `/api/orders/admin/customers/stats` | Agregados por cliente para Admin Clientes (`customerIds` separados por coma) | — | `200` `List<AdminCustomerOrderStatsResponse>` | Sí (admin) |
+| `GET` | `/api/orders/admin/customers/summary` | KPIs de clientes con pedidos (`recurringCustomers`, `averageTicket`) | — | `200` AdminCustomerOrderSummaryResponse | Sí (admin) |
 
 El `POST /api/orders/{orderId}/status` acepta además a un `admin` sobre pedidos de terceros: el servicio comprueba el rol propagado por el gateway y omite la verificación de propiedad **sólo** para ese endpoint. La lectura y la cancelación siguen exigiendo ser el dueño.
 
@@ -47,9 +49,11 @@ El `POST /api/orders/{orderId}/status` acepta además a un `admin` sobre pedidos
 | `GET` | `/api/orders/admin` | Listado **global** de pedidos para la tabla del Admin Pedidos; admite `q` (orderNumber/customerId), `status`, `from`, `to`, paginado; `GET /api/orders` sigue devolviendo sólo los del usuario actual | ✅ Implementado |
 | `GET` | `/api/orders/admin/stats` | Totales de pantalla y contadores por estado (`todos/pendiente/pagado/enviado/entregado/cancelado`) para Admin Pedidos; `cancelledInPeriod` cuenta cancelados en los últimos 30 días UTC | ✅ Implementado |
 | `GET` | `/api/orders/admin/summary` | KPIs del Admin Resumen: ventas de hoy/ayer, pedidos de hoy, pedidos pendientes (incl. sin pago acreditado), ventas/órdenes de la semana y semana previa, serie de 7 días (total, pedidos, ticket promedio), últimos pedidos | ✅ Implementado |
+| `GET` | `/api/orders/admin/customers/stats` | Agregados por cliente para Admin Clientes: `orderCount`, `totalSpent` y `lastPurchaseAt`; siempre devuelve una entrada por cada `customerIds` solicitado, con ceros si no tiene pedidos | ✅ Implementado |
+| `GET` | `/api/orders/admin/customers/summary` | Dueño del cálculo de `recurringCustomers` (clientes con ≥ 2 pedidos) y `averageTicket` (total / clientes con pedidos), excluyendo `CANCELLED` | ✅ Implementado |
 | `POST` | `/api/orders/{orderId}/status` con rol `admin` sobre pedidos de terceros | El cambio de estado permite al admin actuar sobre cualquier pedido | ✅ Implementado |
 
-> El gateway exige `ROLE_admin` para `/api/orders/admin/**`; el servicio vuelve a verificar `X-User-Roles` para no depender de que la petición haya pasado por el gateway. Los importes y conteos del resumen excluyen pedidos `CANCELLED`; la serie usa días naturales en UTC (ver §4.3).
+> El gateway exige `ROLE_admin` para `/api/orders/admin/**`; el servicio vuelve a verificar `X-User-Roles` para no depender de que la petición haya pasado por el gateway. Los importes y conteos de todos los resúmenes, incluidos los agregados de Admin Clientes, excluyen pedidos `CANCELLED`; la serie usa días naturales en UTC (ver §4.3). `customer-service` es un consumidor de estos agregados: no calcula ni almacena copias de pedidos.
 
 ---
 
@@ -154,6 +158,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Consultas admin | `GET /api/orders/admin`, `/admin/stats` y `/admin/summary` exigen rol `admin` en el gateway **y** en el servicio. El listado admite `q` (búsqueda por `orderNumber` o `customerId`, case-insensitive), `status`, `from` (inclusive) y `to` (exclusive) sobre `created_at`, paginado con `createdAt DESC` por defecto |
 | Resumen admin | `salesToday`/`ordersToday` y `salesByDay` se calculan de `orders` en UTC, excluyendo `CANCELLED`. `pendingOrders` = `PENDING` + `PAID`; `pendingWithoutPayment` = `PENDING` (sin `PAYMENT_APPROVED`). La serie cubre 7 días naturales y cada día expone `total`, `orders` y `averageTicket` (`total / pedidos`, 2 decimales). `recentOrders` son los 5 pedidos más recientes |
 | Stats admin pedidos | `GET /api/orders/admin/stats` expone `totalOrders`, `pendingDispatch` (`PENDING` + `PAID`), `cancelledInPeriod` (cancelados con `createdAt >= hoy-29 días UTC`) y `statusCounts` por estado para las tabs del wireframe |
+| Agregados de Admin Clientes | `GET /api/orders/admin/customers/stats?customerIds=<uuid,uuid,...>` agrupa pedidos no cancelados por cliente y devuelve `customerId`, `orderCount`, `totalSpent` y `lastPurchaseAt` (ceros y `null` si no hay pedidos). `GET /api/orders/admin/customers/summary` devuelve `recurringCustomers` (≥ 2 pedidos) y `averageTicket` = total gastado / cantidad de clientes con al menos un pedido, 2 decimales. Ambos exigen rol `admin` en el servicio, no sólo en el gateway |
 | Propagación de cupón | `couponCode` del `CreateOrderRequest` (opcional) se copia al `ORDER_CREATED`; si no se envía, el campo sale `null` y los consumidores antiguos siguen funcionando |
 | Concurrencia | `@Version` en `orders`: cambios concurrentes → `409` |
 | Outbox transaccional | Los eventos se agregan a `outbox_events` dentro de la misma transacción; `OutboxRelay` (poll cada `1 s`, batch 50, máx. 10 intentos con re-lectura de `FAILED`) los publica a Kafka con key = `aggregateId` |
@@ -173,6 +178,8 @@ Campos documentados en §2 (requests) y derivados de las entidades de §4.1 (res
 | `AdminOrderStatsResponse` | `GET /api/orders/admin/stats` | `totalOrders`, `pendingDispatch`, `cancelledInPeriod`, `statusCounts { todos, pendiente, pagado, enviado, entregado, cancelado }` | Contadores para header/tabs del Admin Pedidos wireframe |
 | `AdminSalesDayResponse` | `salesByDay[]` del resumen | `date` (ISO `yyyy-MM-dd`, UTC), `total`, `orders`, `averageTicket` | Serie de 7 días naturales, incluidos los días sin pedidos |
 | `AdminOrderSummaryResponse` | `GET /api/orders/admin/summary` | `salesToday`, `salesYesterday`, `ordersToday`, `pendingOrders`, `pendingWithoutPayment`, `weekOrders`, `previousWeekSales`, `salesByDay[]`, `recentOrders[]` | Ver reglas en §4.3 |
+| `AdminCustomerOrderStatsResponse` | `GET /api/orders/admin/customers/stats` | `customerId`, `orderCount`, `totalSpent`, `lastPurchaseAt` | Una entrada por `customerIds` solicitado; pedidos `CANCELLED` excluidos |
+| `AdminCustomerOrderSummaryResponse` | `GET /api/orders/admin/customers/summary` | `recurringCustomers`, `averageTicket` | Ver reglas en §4.3; consumido por `customer-service` |
 
 ---
 
@@ -276,3 +283,4 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | **Admin Resumen — KPI "Pedidos pendientes"** ("4 sin pago acreditado") | `pendingOrders` (`PENDING` + `PAID`) y `pendingWithoutPayment` (`PENDING`) del resumen | ✅ Implementado |
 | **Admin Resumen — gráfico "Ventas de los últimos 7 días"** (total, pedidos, ticket promedio) | `salesByDay[]` del resumen: 7 días UTC con `total`, `orders` y `averageTicket` | ✅ Implementado |
 | **Admin Resumen — tabla "Últimos pedidos"** | `recentOrders[]` del resumen (5 pedidos más recientes, mismo DTO que la tabla global) | ✅ Implementado |
+| **Admin Clientes — columnas de compra y KPIs** | `GET /api/orders/admin/customers/stats` y `/summary` son la única fuente de `orderCount`, `totalSpent`, `lastPurchaseAt`, `recurringCustomers` y `averageTicket`; `customer-service` compone la tabla y aplica la regla de segmentos (§4.3) | ✅ Implementado |

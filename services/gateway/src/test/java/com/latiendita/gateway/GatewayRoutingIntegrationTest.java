@@ -79,6 +79,7 @@ class GatewayRoutingIntegrationTest {
         registry.add("ORDER_SERVICE_BASE_URL", () -> base);
         registry.add("PAYMENT_SERVICE_BASE_URL", () -> base);
         registry.add("REVIEW_SERVICE_BASE_URL", () -> base);
+        registry.add("CUSTOMER_SERVICE_BASE_URL", () -> base);
     }
 
     @Autowired
@@ -207,6 +208,53 @@ class GatewayRoutingIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(lastRequestPath).isEqualTo("/api/orders/admin");
+    }
+
+    @Test
+    void rechazaAlClienteElListadoAdminDeCustomers() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/customers", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteAlAdminElListadoDeCustomers() {
+        String token = TestJwtFactory.token(42, "admin");
+        ResponseEntity<String> response = rest.exchange("/api/customers", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastRequestPath).isEqualTo("/api/customers");
+    }
+
+    @Test
+    void rechazaAlClienteElResumenAdminDeCustomers() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/customers/admin/summary",
+                HttpMethod.GET, new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void rechazaAlClienteLaConsultaDeCustomerPorId() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/customers/11111111-1111-1111-1111-111111111111",
+                HttpMethod.GET, new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteAlClienteSuPropioPerfilAunqueExisteLaReglaAdmin() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/customers/me", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastRequestPath).isEqualTo("/api/customers/me");
     }
 
     @Test

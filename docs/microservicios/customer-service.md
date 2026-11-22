@@ -18,7 +18,7 @@ Gestiona el **perfil del cliente** de la plataforma: alta del registro de client
 
 Todas las rutas son relativas a la raíz del servicio (ej. `http://customerService:8080`).
 
-> **Nota:** Propuesta de contrato; aún no implementado. El servicio es un scaffold (solo `CustomerServiceApplication` y su test): los endpoints, entidades y eventos de este documento definen lo que debería implementarse para cumplir el wireframe.
+> **Estado:** el servicio ya está integrado al gateway. `GET /api/customers` conserva su contrato histórico y se agregó el prefijo `/api/customers/admin/**` para Admin Clientes. Los agregados de pedidos son calculados por `order-service`; este servicio sólo compone los DTOs de respuesta.
 
 La identidad llega propagada por el gateway en los headers `X-User-Id` (claim `sub`), `X-User-Email` y `X-User-Roles`; toda petición incluye además `X-Correlation-Id`.
 
@@ -28,11 +28,22 @@ La identidad llega propagada por el gateway en los headers `X-User-Id` (claim `s
 | `POST` | `/api/customers` | Alta idempotente del perfil en el primer login (clave = `X-User-Id`); crea el registro si no existe | `CreateCustomerRequest` | `201`/`200` CustomerDto | Sí (cliente) |
 | `GET` | `/api/customers/me` | Obtiene el perfil del cliente autenticado | — | `200` CustomerDto | Sí (cliente) |
 | `PATCH` | `/api/customers/me` | Actualiza datos de contacto (nombre, apellido, teléfono) | `UpdateCustomerRequest` | `200` CustomerDto | Sí (cliente) |
-| `GET` | `/api/customers` | Listado de clientes para Admin Clientes (paginado; filtros por nombre, email y estado) | — (query params) | `200` `Page<CustomerSummaryDto>` | Sí (admin) |
+| `GET` | `/api/customers` | Listado histórico de clientes (paginado; filtros por nombre, email y estado); contrato sin cambios | — (query params) | `200` `Page<CustomerSummaryDto>` | Sí (admin) |
+| `GET` | `/api/customers/admin` | Listado de Admin Clientes con `name`, `email`, `phone`, `status`, `segment`, `sort`, `page` y `size` | — (query params) | `200` `Page<AdminCustomerResponse>` | Sí (admin) |
+| `GET` | `/api/customers/admin/summary` | KPIs del wireframe con los mismos filtros que el listado (incluye `phone`) | — (query params) | `200` `AdminCustomerSummaryResponse` | Sí (admin) |
+| `GET` | `/api/customers/admin/export.csv` | Exportación CSV con el mismo filtrado y orden (incluye `phone`) | — (query params) | `200` `text/csv` | Sí (admin) |
 | `GET` | `/api/customers/{id}` | Detalle de un cliente para Admin Clientes (datos, estado y actividad) | — | `200` CustomerDto | Sí (admin) |
 | `PUT` | `/api/customers/me/newsletter` | Suscribe o da de baja de la newsletter, registrando el consentimiento | `NewsletterRequest` | `200` NewsletterDto | Sí (cliente) |
 
-*Nota de integración:* el gateway aún no expone `/api/customers/**`; se debe agregar una ruta `Path=/api/customers/**` → `lb://customerService`, y las rutas de listado/detalle de clientes deben exigir `hasRole("admin")` (hoy `anyRequest().authenticated()` sólo autentica).
+*Nota de integración:* el gateway enruta `/api/customers/**` a `customerService` y exige `hasRole("admin")` para `/api/customers` y `/api/customers/admin/**`. Las llamadas internas a `/api/orders/admin/**` reenvían únicamente los headers de identidad inyectados por el gateway (`X-User-Id`, `X-User-Email`, `X-User-Roles`), nunca datos del body ni otros headers.
+
+### 2.1 Reglas de Admin Clientes
+
+- `segment`: `sin-compras` si `orderCount == 0`; si no, `recurrente` si `orderCount >= 2`; si no, `nueva` si `createdAt` está en los últimos 30 días; si no, `activa` para `ACTIVE` o `inactiva` para `SUSPENDED`. `sin-compras` se evalúa primero y se mantiene distinto de `SUSPENDED`: el badge del wireframe muestra `Inactiva`, pero el filtro `Sin compras` usa su propio segmento. En JSON se serializa en minúsculas.
+- `phone`: filtro dedicado sobre `CustomerEntity.phone` con el mismo patrón `LIKE` recortado y en minúsculas que `email`; `/summary` y `/export.csv` aceptan el mismo `phone`. El parámetro `name` es de búsqueda libre y coincide con `firstName`, `lastName`, `email` o `phone`. Cuando `name`, `email` y `phone` reciben el mismo término —como hace el único cuadro de búsqueda del wireframe— se trata como una sola búsqueda libre (OR) y no como tres filtros AND; valores distintos en `email` o `phone` conservan su significado estrecho.
+- `orderCount`, `totalSpent` y `lastPurchaseAt` llegan de `GET /api/orders/admin/customers/stats`; los pedidos `CANCELLED` quedan excluidos. Un cliente sin pedidos no cancelados recibe ceros y `lastPurchaseAt = null`.
+- `summary` sin filtros toma `recurring` y `averageTicket` de `GET /api/orders/admin/customers/summary`. Con cualquier filtro, ambos se recalculan a partir de las estadísticas de los clientes filtrados. `averageTicket` = total gastado / cantidad de clientes con al menos un pedido.
+- Si `order-service` no responde, el cliente HTTP registra `warn` y degrada a listas vacías o ceros; nunca inventa pedidos ni modifica los datos del cliente.
 
 ---
 
@@ -103,12 +114,15 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 
 ### 4.4 DTOs (contratos de API)
 
-> **Propuesto; aún no implementado.** Servicio *scaffold*: los campos se derivan de la entidad de §4.1 y de lo que exige el wireframe (§7). Sin direcciones: viven en `shipment-service` (`delivery_addresses`).
+> Los campos se derivan de la entidad de §4.1 y del contrato de Admin Clientes (§2.1). Sin direcciones: viven en `shipment-service` (`delivery_addresses`).
 
 | DTO | Uso | Campos | Origen / nota |
 |---|---|---|---|
 | `CustomerDto` | `POST /api/customers`, `GET /api/customers/me`, `GET /api/customers/{id}` | `id`, `authorizerSub`, `email`, `firstName`, `lastName`, `phone`, `status`, `newsletterOptIn`, `newsletterConsentAt`, `lastLoginAt`, `createdAt`, `updatedAt` | De `Customer`; se omite `deletedAt` (borrado lógico interno) |
-| `CustomerSummaryDto` | `GET /api/customers` (Admin Clientes) | `id`, `firstName`, `lastName`, `email`, `status`, `lastLoginAt` | Proyección reducida para el listado; filtros por nombre, email y estado (§2) |
+| `CustomerSummaryDto` | `GET /api/customers` (listado histórico) | `id`, `firstName`, `lastName`, `email`, `status`, `lastLoginAt` | Proyección reducida; contrato intacto, filtros por nombre, email y estado (§2) |
+| `AdminCustomerResponse` | `GET /api/customers/admin` | `customerId`, `firstName`, `lastName`, `email`, `phone`, `status`, `createdAt`, `lastLoginAt`, `orderCount`, `totalSpent`, `lastPurchaseAt`, `segment` | Fusión del cliente con los agregados de `order-service`; `segment` en minúsculas (§2.1) |
+| `AdminCustomerSummaryResponse` | `GET /api/customers/admin/summary` | `totalCustomers`, `newThisMonth`, `recurring`, `averageTicket` | KPIs con los mismos filtros que el listado (§2.1) |
+| `CustomerOrderStats` / `CustomerOrderSummary` | DTO internos del `OrderClient` | `customerId`, `orderCount`, `totalSpent`, `lastPurchaseAt` / `recurringCustomers`, `averageTicket` | Espejo de los agregados de `order-service`; nunca se construyen con datos mock |
 | `CreateCustomerRequest` | `POST /api/customers` | `authorizerSub`, `email`, `firstName`, `lastName`, `phone` | `authorizerSub` se toma del header `X-User-Id`; alta idempotente en el primer login |
 | `UpdateCustomerRequest` | `PATCH /api/customers/me` | `firstName`, `lastName`, `phone` | Datos de contacto (§2) |
 | `NewsletterRequest` | `PUT /api/customers/me/newsletter` | `newsletterOptIn` | El alta exige consentimiento explícito; la baja es inmediata (§4.3) |
@@ -160,7 +174,7 @@ No hay `JWT_SECRET`: el gateway valida el JWT (firma HS256 e issuer de Authorize
 | Servicio | Para qué | Protocolo | Fallback si cae | Crítica |
 |---|---|---|---|---|
 | `gateway` | Enruta `/api/customers/**`, valida el JWT, inyecta `X-User-Id`/`X-User-Email`/`X-User-Roles` y propaga `X-Correlation-Id` | HTTP/REST (upstream; este servicio no lo llama) | El servicio no está expuesto fuera del gateway | ✅ Sí |
-| `order-service` | Último pedido del cliente para la columna de actividad de Admin Clientes | HTTP/REST (`ORDER_SERVICE_BASE_URL`, por defecto `http://localhost:8080`) | Mostrar sólo la actividad de sesión (`last_login_at`) | ❌ No |
+| `order-service` | Agregados reales para Admin Clientes: `/api/orders/admin/customers/stats` y `/api/orders/admin/customers/summary` | HTTP/REST (`ORDER_SERVICE_BASE_URL`, por defecto `http://localhost:8080`) | Ceros y listas vacías con log `warn`; nunca se inventan pedidos | ❌ No |
 
 ### 6.2 Dependencias externas
 
@@ -191,6 +205,6 @@ Fuente: `docs/OpenPencil/LaTiendita.fig`, página "WireFrame".
 | `Register` / `Login` (tarjeta «Auth card») | Solo el perfil: alta idempotente en el primer login con `POST /api/customers` (clave = `sub`). Las credenciales y la contraseña las maneja Authorizer: fuera del alcance |
 | `Password Recovery` (tarjeta «Auth card») | Sin implementación en este servicio; la recuperación de contraseña es responsabilidad de Authorizer |
 | `Home` (sección Newsletter) | Suscripción y baja con consentimiento: `PUT /api/customers/me/newsletter` |
-| `Admin → Clientes` (panel junto a Resumen, Productos, Categorías, Pedidos y Pagos) | Listado y detalle con datos, estado y actividad: `GET /api/customers`, `GET /api/customers/{id}` |
+| `Admin → Clientes` (panel junto a Resumen, Productos, Categorías, Pedidos y Pagos) | Listado, KPIs, CSV y detalle: `GET /api/customers/admin`, `/admin/summary`, `/admin/export.csv` y `GET /api/customers/{id}`; segmentos y métricas derivadas de agregados reales de pedidos (§2.1) |
 | `Checkout` / perfil (datos de contacto) | Consulta y actualización: `GET /api/customers/me`, `PATCH /api/customers/me` |
 | `Product Detail`, `Cart`, `Listings`, `Pagos` | No aplica a este servicio (sin responsabilidad propuesta) |

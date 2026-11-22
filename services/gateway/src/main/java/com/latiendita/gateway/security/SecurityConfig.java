@@ -56,6 +56,17 @@ public class SecurityConfig {
                 // de producto); la moderación administrativa exige el rol admin.
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 .requestMatchers("/api/admin/reviews/**").hasRole(ADMIN_ROLE)
+                // Perfil propio y autoprovision del cliente: cualquier usuario autenticado.
+                // Van ANTES del listado admin para que /me no caiga en /api/customers/*.
+                .requestMatchers(HttpMethod.POST, "/api/customers").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/customers/me").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/customers/me").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/customers/me/newsletter").authenticated()
+                // Listado y consulta por id de customers son operaciones de administración.
+                .requestMatchers(HttpMethod.GET, "/api/customers").hasRole(ADMIN_ROLE)
+                // El prefijo /admin es explícito y no debe caer en /api/customers/*.
+                .requestMatchers("/api/customers/admin/**").hasRole(ADMIN_ROLE)
+                .requestMatchers(HttpMethod.GET, "/api/customers/*").hasRole(ADMIN_ROLE)
                 // Las consultas globales del admin de pedidos no son del cliente actual.
                 .requestMatchers("/api/orders/admin/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**")
