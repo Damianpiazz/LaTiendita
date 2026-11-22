@@ -7,10 +7,14 @@ export const metadata: Metadata = {
   title: "Clientes",
 };
 
-export default function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   return (
     <Suspense fallback={<div className="min-h-[50vh] bg-wf-canvas" aria-busy="true" />}>
-      <AdminClientsPage />
+      <AdminClientsPage searchParams={searchParams} />
     </Suspense>
   );
 }

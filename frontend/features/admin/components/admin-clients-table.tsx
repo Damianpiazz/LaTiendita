@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ClientStatusBadge } from "@/features/admin/components/client-status-badge";
 import type { AdminClients } from "@/features/admin/types";
 import { formatPrice } from "@/features/product/helpers/format-price";
@@ -7,7 +9,8 @@ import { formatPrice } from "@/features/product/helpers/format-price";
  *
  * The frame draws no card header here (unlike products and orders), so the
  * card starts with the table head: 552 = 40 + 8 × 64. Column widths are the
- * frame's and the wrapper scrolls sideways under 1096px.
+ * frame's and the wrapper scrolls sideways under 1096px. `Ver →` now opens the
+ * same route with a `customer` query param that the server page resolves.
  */
 export function AdminClientsTable({ clients }: { clients: AdminClients }) {
   return (
@@ -41,52 +44,61 @@ export function AdminClientsTable({ clients }: { clients: AdminClients }) {
             </div>
           </div>
 
-          {clients.items.map((client) => (
-            <div
-              key={client.email}
-              role="row"
-              className="flex h-16 items-center border-b border-wf-line px-5 text-sm last:border-b-0"
-            >
-              <div role="cell" className="flex w-[340px] min-w-0 items-center gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-wf-subtle text-xs font-bold text-wf-ink-secondary"
-                >
-                  {client.initials}
-                </span>
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate font-medium text-wf-ink">
-                    {client.name}
-                  </span>
-                  <span className="truncate text-xs text-wf-ink-muted">
-                    {client.email}
-                  </span>
-                </span>
-              </div>
+          {clients.items.map((client) => {
+            const customerId = client.customerId ?? client.email;
 
-              <div role="cell" className="w-[150px] text-wf-ink-secondary">
-                {client.phone}
-              </div>
-              <div role="cell" className="w-[90px] text-wf-ink-secondary">
-                {client.orderCount}
-              </div>
-              <div role="cell" className="w-[140px] font-medium text-wf-ink">
-                {formatPrice(client.totalSpent)}
-              </div>
-              <div role="cell" className="w-[140px] text-wf-ink-muted">
-                {client.lastPurchase}
-              </div>
-              <div role="cell" className="w-[130px]">
-                <ClientStatusBadge status={client.status} />
-              </div>
+            return (
               <div
-                role="cell"
-                className="flex flex-1 justify-end font-medium text-wf-ink-secondary"
+                key={customerId}
+                role="row"
+                className="flex h-16 items-center border-b border-wf-line px-5 text-sm last:border-b-0"
               >
-                Ver →
+                <div role="cell" className="flex w-[340px] min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-wf-subtle text-xs font-bold text-wf-ink-secondary"
+                  >
+                    {client.initials}
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate font-medium text-wf-ink">
+                      {client.name}
+                    </span>
+                    <span className="truncate text-xs text-wf-ink-muted">
+                      {client.email}
+                    </span>
+                  </span>
+                </div>
+
+                <div role="cell" className="w-[150px] text-wf-ink-secondary">
+                  {client.phone}
+                </div>
+                <div role="cell" className="w-[90px] text-wf-ink-secondary">
+                  {client.orderCount}
+                </div>
+                <div role="cell" className="w-[140px] font-medium text-wf-ink">
+                  {formatPrice(client.totalSpent)}
+                </div>
+                <div role="cell" className="w-[140px] text-wf-ink-muted">
+                  {client.lastPurchase}
+                </div>
+                <div role="cell" className="w-[130px]">
+                  <ClientStatusBadge status={client.status} />
+                </div>
+                <div
+                  role="cell"
+                  className="flex flex-1 justify-end font-medium text-wf-ink-secondary"
+                >
+                  <Link
+                    href={`/admin/clientes?customer=${encodeURIComponent(customerId)}`}
+                    className="transition-colors hover:text-wf-ink"
+                  >
+                    Ver →
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

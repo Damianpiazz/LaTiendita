@@ -1,15 +1,31 @@
+import type { AdminClientSegment } from "@/features/admin/types";
 import { cn } from "@/lib/utils";
 
-const filters = ["Todos", "Nuevos", "Recurrentes", "Sin compras"];
+const filters: { label: string; value: AdminClientSegment | undefined }[] = [
+  { label: "Todos", value: undefined },
+  { label: "Nuevos", value: "nueva" },
+  { label: "Recurrentes", value: "recurrente" },
+  { label: "Sin compras", value: "sin-compras" },
+];
 
-/**
- * Search, segment filters and sort control above the clients table.
- *
- * `Todos` is the drawn active filter and nothing is clickable yet: the frame
- * only draws the resting state of the four segments, and the mock always
- * serves the first page.
- */
-export function AdminClientsToolbar() {
+/** Search, segment filters and sort control above the clients table. */
+export function AdminClientsToolbar({
+  search,
+  segment,
+  sort,
+  onSearchChange,
+  onSegmentChange,
+  onSortChange,
+}: {
+  search: string;
+  segment: AdminClientSegment | undefined;
+  sort: string;
+  onSearchChange: (value: string) => void;
+  onSegmentChange: (value: AdminClientSegment | undefined) => void;
+  onSortChange: () => void;
+}) {
+  const ascending = sort.endsWith(",asc");
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -23,34 +39,42 @@ export function AdminClientsToolbar() {
           <input
             id="admin-clients-search"
             type="search"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Buscar por nombre, email o teléfono..."
             className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
           />
         </div>
 
         {filters.map((filter) => {
-          const active = filter === "Todos";
+          const active = segment === filter.value;
 
           return (
-            <span
-              key={filter}
+            <button
+              key={filter.label}
+              type="button"
+              onClick={() => onSegmentChange(filter.value)}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "flex h-10 items-center rounded-full px-4 text-sm",
+                "flex h-10 items-center rounded-full px-4 text-sm transition-colors",
                 active
                   ? "bg-wf-inverse font-medium text-wf-on-inverse"
-                  : "border border-wf-line-strong bg-wf-surface text-wf-ink-secondary",
+                  : "border border-wf-line-strong bg-wf-surface text-wf-ink-secondary hover:bg-wf-canvas",
               )}
             >
-              {filter}
-            </span>
+              {filter.label}
+            </button>
           );
         })}
       </div>
 
-      <span className="text-sm font-medium text-wf-ink-secondary">
-        Ordenar: Última compra ↓
-      </span>
+      <button
+        type="button"
+        onClick={onSortChange}
+        className="text-sm font-medium text-wf-ink-secondary transition-colors hover:text-wf-ink"
+      >
+        {`Ordenar: Última compra ${ascending ? "↑" : "↓"}`}
+      </button>
     </div>
   );
 }

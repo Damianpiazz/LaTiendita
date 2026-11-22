@@ -24,6 +24,10 @@ import {
   type AdminOrderSummaryApi,
   type AdminPaymentSummaryApi,
 } from "@/features/admin/helpers/admin-summary.mapper";
+import {
+  ADMIN_CLIENTS_DEFAULT_SORT,
+  ADMIN_CLIENTS_PAGE_SIZE,
+} from "@/features/admin/helpers/admin-clients.constants";
 import type {
   AdminCategories,
   AdminCategoriesQuery,
@@ -47,6 +51,11 @@ import type {
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/session";
 import { httpClient } from "@/lib/http/client";
 
+export {
+  ADMIN_CLIENTS_DEFAULT_SORT,
+  ADMIN_CLIENTS_PAGE_SIZE,
+} from "@/features/admin/helpers/admin-clients.constants";
+
 const LOW_STOCK_THRESHOLD = 5;
 const LOW_STOCK_SIZE = 5;
 
@@ -61,10 +70,6 @@ export const ADMIN_ORDERS_DEFAULT_SORT = "createdAt,desc";
 /** The categories wireframe draws six rows, ordered A–Z. */
 export const ADMIN_CATEGORIES_PAGE_SIZE = 6;
 export const ADMIN_CATEGORIES_DEFAULT_SORT = "name,asc";
-
-/** The clients wireframe draws eight rows, newest purchase first. */
-export const ADMIN_CLIENTS_PAGE_SIZE = 8;
-export const ADMIN_CLIENTS_DEFAULT_SORT = "lastPurchaseAt,desc";
 
 /** The payments wireframe draws eight rows, newest first, in a 30-day range. */
 export const ADMIN_PAYMENTS_PAGE_SIZE = 8;
@@ -417,7 +422,8 @@ function toClientSegment(value: unknown): AdminClientSegment | undefined {
     value === "nueva" ||
     value === "recurrente" ||
     value === "activa" ||
-    value === "inactiva"
+    value === "inactiva" ||
+    value === "sin-compras"
   ) {
     return value;
   }
@@ -427,6 +433,8 @@ function toClientSegment(value: unknown): AdminClientSegment | undefined {
 /**
  * The wireframe badge follows the backend segment; `ACTIVE`/`SUSPENDED` is the
  * account status and is only used for the detail where no segment is present.
+ * `sin-compras` keeps its own value so the filter stays distinct from the
+ * `inactiva` badge printed for suspended accounts.
  */
 function statusFromSegment(segment?: AdminClientSegment): AdminClientStatus {
   return segment ?? "activa";

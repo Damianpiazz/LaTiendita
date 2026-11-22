@@ -32,6 +32,10 @@ const statusStyles: Record<
     label: "Inactiva",
     className: "border border-wf-line-strong bg-wf-surface text-wf-ink-muted",
   },
+  "sin-compras": {
+    label: "Inactiva",
+    className: "border border-wf-line-strong bg-wf-surface text-wf-ink-muted",
+  },
 };
 
 export function ClientStatusBadge({ status }: { status: AdminClientStatus }) {

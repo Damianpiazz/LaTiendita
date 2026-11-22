@@ -1,7 +1,6 @@
 import type { MockRoute } from "./adapter";
 import {
   adminCategories,
-  adminClients,
   adminNavigation,
   adminOrders,
   adminPayments,
@@ -111,11 +110,6 @@ export const mockRoutes: MockRoute[] = [
     method: "GET",
     path: "/admin/payments",
     handler: () => adminPayments,
-  },
-  {
-    method: "GET",
-    path: "/admin/clients",
-    handler: () => adminClients,
   },
   {
     method: "GET",
