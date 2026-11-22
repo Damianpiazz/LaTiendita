@@ -56,17 +56,35 @@ export async function getCustomerProfile(): Promise<CustomerProfile> {
       redirect("/ingresar");
     }
 
-    const { data } = await httpClient.post<CustomerDto>(
-      "/api/customers",
-      {
-        email: user.email,
-        firstName: user.givenName || user.email.split("@")[0],
-        lastName: user.familyName || "-",
-        phone: "",
-      },
-      { headers },
-    );
+    let customer: CustomerDto;
 
-    return mapCustomerDtoToProfile(data);
+    try {
+      const { data } = await httpClient.post<CustomerDto>(
+        "/api/customers",
+        {
+          email: user.email,
+          firstName: user.givenName || user.email.split("@")[0],
+          lastName: user.familyName || "-",
+          phone: "",
+        },
+        { headers },
+      );
+      customer = data;
+    } catch (error) {
+      if (statusOf(error) !== 409) {
+        throw error;
+      }
+
+      // An account recreated in Authorizer can leave an orphaned customer row.
+      // The backend reclaims it by email, so re-read instead of crashing here.
+      try {
+        const { data } = await httpClient.get<CustomerDto>("/api/customers/me", { headers });
+        customer = data;
+      } catch {
+        redirect("/ingresar");
+      }
+    }
+
+    return mapCustomerDtoToProfile(customer);
   }
 }

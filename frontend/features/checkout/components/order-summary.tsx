@@ -4,7 +4,10 @@ import { formatPrice } from "@/features/product/helpers/format-price";
 
 type OrderSummaryAction = {
   label: string;
-  href: string;
+  href?: string;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  form?: string;
 };
 
 type OrderSummaryProps = {
@@ -36,6 +39,10 @@ export function OrderSummary({
   secondaryAction,
 }: OrderSummaryProps) {
   const productLabel = units === 1 ? "producto" : "productos";
+  const primaryClassName =
+    "flex h-12 w-full items-center justify-center rounded-wf-sm bg-wf-inverse text-base font-medium text-wf-on-inverse transition-colors hover:bg-wf-ink disabled:cursor-not-allowed disabled:opacity-60";
+  const secondaryClassName =
+    "flex h-12 items-center justify-center rounded-wf-sm border border-wf-line-strong bg-wf-surface text-base font-medium text-wf-ink-secondary transition-colors hover:bg-wf-canvas";
 
   return (
     <div className="flex w-full flex-col gap-4 rounded-wf-md border border-wf-line bg-wf-surface p-5 lg:w-[376px] lg:shrink-0 lg:self-start">
@@ -64,19 +71,34 @@ export function OrderSummary({
         <span className="text-lg font-bold text-wf-ink">{formatPrice(total)}</span>
       </div>
 
-      <Link
-        href={primaryAction.href}
-        className="flex h-12 items-center justify-center rounded-wf-sm bg-wf-inverse text-base font-medium text-wf-on-inverse transition-colors hover:bg-wf-ink"
-      >
-        {primaryAction.label}
-      </Link>
+      {primaryAction.href && primaryAction.type !== "submit" ? (
+        <Link href={primaryAction.href} className={primaryClassName}>
+          {primaryAction.label}
+        </Link>
+      ) : (
+        <button
+          type={primaryAction.type ?? "button"}
+          form={primaryAction.form}
+          disabled={primaryAction.disabled}
+          className={primaryClassName}
+        >
+          {primaryAction.label}
+        </button>
+      )}
 
-      <Link
-        href={secondaryAction.href}
-        className="flex h-12 items-center justify-center rounded-wf-sm border border-wf-line-strong bg-wf-surface text-base font-medium text-wf-ink-secondary transition-colors hover:bg-wf-canvas"
-      >
-        {secondaryAction.label}
-      </Link>
+      {secondaryAction.href ? (
+        <Link href={secondaryAction.href} className={secondaryClassName}>
+          {secondaryAction.label}
+        </Link>
+      ) : (
+        <button
+          type={secondaryAction.type ?? "button"}
+          disabled={secondaryAction.disabled}
+          className={secondaryClassName}
+        >
+          {secondaryAction.label}
+        </button>
+      )}
 
       <p className="text-xs text-wf-ink-muted">Impuestos incluidos en los precios</p>
     </div>

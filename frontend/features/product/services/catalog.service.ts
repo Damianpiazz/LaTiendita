@@ -12,6 +12,7 @@ import { httpClient } from "@/lib/http/client";
 type ProductFilters = {
   featured?: boolean;
   categoryId?: string;
+  size?: number;
 };
 
 type Page<T> = {
@@ -111,7 +112,10 @@ export async function getCategories({ featured }: { featured?: boolean } = {}): 
   cacheLife("hours");
 
   const { data } = await httpClient.get<Page<CategoryDto> | CategoryDto[]>("/api/categories", {
-    params: featured === undefined ? {} : { featured },
+    params: {
+      size: 100,
+      ...(featured === undefined ? {} : { featured }),
+    },
   });
 
   return unwrapPage(data).map(toCategory);
@@ -131,12 +135,14 @@ export async function getCategoryBySlug(slug: string): Promise<Category> {
 export async function getProducts({
   featured,
   categoryId,
+  size,
 }: ProductFilters = {}): Promise<Product[]> {
   "use cache";
   cacheLife("hours");
 
   const { data } = await httpClient.get<Page<ProductDto> | ProductDto[]>("/api/products", {
     params: {
+      ...(size === undefined ? {} : { size }),
       ...(featured === undefined ? {} : { featured }),
       ...(categoryId === undefined ? {} : { categoryId }),
     },
@@ -151,7 +157,7 @@ export function getFeaturedProducts(): Promise<Product[]> {
 
 /** Listing of one category's products; the screen filters and paginates it. */
 export function getCategoryProducts(categoryId: string): Promise<Product[]> {
-  return getProducts({ categoryId });
+  return getProducts({ categoryId, size: 100 });
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail> {

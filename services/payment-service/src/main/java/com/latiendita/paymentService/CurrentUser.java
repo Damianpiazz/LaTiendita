@@ -1,6 +1,8 @@
 package com.latiendita.paymentService;
 
+import com.latiendita.paymentService.exception.AdminRoleRequiredException;
 import com.latiendita.paymentService.exception.MissingGatewayHeaderException;
+import java.util.Arrays;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -8,6 +10,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public final class CurrentUser {
 
     public static final String HEADER = "X-User-Id";
+    public static final String ROLES_HEADER = "X-User-Roles";
+    public static final String ADMIN_ROLE = "admin";
 
     private CurrentUser() {}
 
@@ -16,14 +20,42 @@ public final class CurrentUser {
      * no vacío es válido: la validación de firma e issuer ya la hizo el gateway.
      */
     public static String id() {
-        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
-            throw new MissingGatewayHeaderException();
-        }
-        String value = servletAttributes.getRequest().getHeader(HEADER);
+        String value = readHeader(HEADER);
         if (value == null || value.isBlank()) {
             throw new MissingGatewayHeaderException();
         }
         return value.trim();
+    }
+
+    public static boolean isAdmin() {
+        String roles = readHeaderOrNull(ROLES_HEADER);
+        if (roles == null || roles.isBlank()) {
+            return false;
+        }
+        return Arrays.stream(roles.split(","))
+                .map(String::trim)
+                .anyMatch(ADMIN_ROLE::equalsIgnoreCase);
+    }
+
+    public static void requireAdmin() {
+        if (!isAdmin()) {
+            throw new AdminRoleRequiredException();
+        }
+    }
+
+    private static String readHeader(String name) {
+        if (!(RequestContextHolder.getRequestAttributes()
+                instanceof ServletRequestAttributes servletAttributes)) {
+            throw new MissingGatewayHeaderException();
+        }
+        return servletAttributes.getRequest().getHeader(name);
+    }
+
+    private static String readHeaderOrNull(String name) {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
+            return null;
+        }
+        return servletAttributes.getRequest().getHeader(name);
     }
 }

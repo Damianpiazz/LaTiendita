@@ -17,6 +17,12 @@ function loginRequest(): Request {
   });
 }
 
+function fakeJwt(claims: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
+  return `${header}.${payload}.sig`;
+}
+
 describe("login BFF route", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -70,5 +76,58 @@ describe("login BFF route", () => {
     });
     expect(cookies).toContain("mfa_session=abc");
     expect(cookies).not.toContain("lt_access_token=");
+  });
+
+  it("re-logins requesting allowed roles when the token is missing them", async () => {
+    const clienteToken = fakeJwt({
+      roles: ["cliente"],
+      allowed_roles: ["admin", "cliente"],
+    });
+    const adminToken = fakeJwt({
+      roles: ["admin", "cliente"],
+      allowed_roles: ["admin", "cliente"],
+    });
+
+    mocks.post
+      .mockResolvedValueOnce({
+        data: {
+          access_token: clienteToken,
+          expires_in: 3600,
+          user: { id: "user-1", email: "cliente@example.com", roles: ["cliente"] },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          access_token: adminToken,
+          expires_in: 3600,
+          user: { id: "user-1", email: "cliente@example.com", roles: ["admin", "cliente"] },
+        },
+      });
+
+    const response = await POST(loginRequest());
+    const cookies = response.headers.get("set-cookie") ?? "";
+
+    expect(response.status).toBe(200);
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+    expect(mocks.post).toHaveBeenNthCalledWith(
+      1,
+      "/api/auth/login",
+      { email: "cliente@example.com", password: "ClaveSegura123!" },
+      { headers: { Origin: "http://localhost:3000" } },
+    );
+    expect(mocks.post).toHaveBeenNthCalledWith(
+      2,
+      "/api/auth/login",
+      {
+        email: "cliente@example.com",
+        password: "ClaveSegura123!",
+        roles: ["admin", "cliente"],
+      },
+      { headers: { Origin: "http://localhost:3000" } },
+    );
+    expect(cookies).toContain(`lt_access_token=${adminToken}`);
+    expect(await response.json()).toMatchObject({
+      user: { id: "user-1", roles: ["admin", "cliente"] },
+    });
   });
 });

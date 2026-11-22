@@ -1,7 +1,13 @@
-import type { AdminPayments, AdminPaymentStatus } from "@/features/admin/types";
+import type {
+  AdminPaymentStatus,
+  AdminPaymentStatusFilter,
+  AdminPayments,
+} from "@/features/admin/types";
 import { cn } from "@/lib/utils";
 
-const tabs: { status: "todos" | AdminPaymentStatus; label: string }[] = [
+type TabStatus = "todos" | AdminPaymentStatus;
+
+const tabs: { status: TabStatus; label: string }[] = [
   { status: "todos", label: "Todos" },
   { status: "aprobado", label: "Aprobados" },
   { status: "pendiente", label: "Pendientes" },
@@ -15,31 +21,42 @@ const counts = (payments: AdminPayments) => ({
   rechazado: payments.rejectedCount,
 });
 
+type AdminPaymentsFiltersProps = {
+  payments: AdminPayments;
+  status: AdminPaymentStatusFilter;
+  onStatusChange: (status: AdminPaymentStatusFilter) => void;
+};
+
 /**
- * Settlement tabs and the period control above the payments table.
+ * Settlement tabs and the 30-day period control above the payments table.
  *
- * Counts come from the endpoint's settlement totals, so they keep summing to
- * the payment total (34 + 11 + 3 = 48). `Todos` is the drawn active tab and the
- * period control is presentational because the frame draws no menu for it.
+ * Counts come from the real summary; the period control stays presentational
+ * because the frame draws no menu and the adapter always requests 30 days.
  */
-export function AdminPaymentsFilters({ payments }: { payments: AdminPayments }) {
+export function AdminPaymentsFilters({
+  payments,
+  status,
+  onStatusChange,
+}: AdminPaymentsFiltersProps) {
   const tabCounts = counts(payments);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-2">
         {tabs.map((tab) => {
-          const active = tab.status === "todos";
+          const active = tab.status === status;
 
           return (
-            <span
+            <button
               key={tab.status}
+              type="button"
               aria-current={active ? "true" : undefined}
+              onClick={() => onStatusChange(tab.status)}
               className={cn(
-                "flex h-10 items-center gap-2 rounded-full px-4 text-sm",
+                "flex h-10 items-center gap-2 rounded-full px-4 text-sm transition-colors",
                 active
                   ? "bg-wf-inverse font-medium text-wf-on-inverse"
-                  : "border border-wf-line-strong bg-wf-surface text-wf-ink-secondary",
+                  : "border border-wf-line-strong bg-wf-surface text-wf-ink-secondary hover:bg-wf-canvas",
               )}
             >
               <span>{tab.label}</span>
@@ -51,7 +68,7 @@ export function AdminPaymentsFilters({ payments }: { payments: AdminPayments }) 
               >
                 {tabCounts[tab.status]}
               </span>
-            </span>
+            </button>
           );
         })}
       </div>

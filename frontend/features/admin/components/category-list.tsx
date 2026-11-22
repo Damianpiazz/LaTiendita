@@ -8,16 +8,19 @@ import { cn } from "@/lib/utils";
  *
  * Every row draws the store path and its product count; the selected one is
  * filled with `background/canvas`, exactly as the frame highlights `Remeras`.
- * The footer repeats the list length, so the copy follows the seed.
+ * The footer repeats the list length, so the copy follows the seed as well as
+ * the real page, and each row selects the category shown in the detail card.
  */
 export function CategoryList({
   items,
   selectedId,
   updatedLabel,
+  onSelect,
 }: {
   items: AdminCategory[];
   selectedId: string;
   updatedLabel: string;
+  onSelect: (category: AdminCategory) => void;
 }) {
   return (
     <section className="overflow-hidden rounded-wf-md border border-wf-line bg-wf-surface">
@@ -43,35 +46,41 @@ export function CategoryList({
           return (
             <li
               key={category.id}
-              aria-current={selected ? "true" : undefined}
               className={cn(
-                "flex h-[72px] items-center gap-3 border-b border-wf-line px-5 last:border-b-0",
+                "flex h-[72px] items-center border-b border-wf-line last:border-b-0",
                 selected && "bg-wf-canvas",
               )}
             >
-              <span
-                aria-hidden
-                className={cn(
-                  "size-10 shrink-0 rounded-wf-sm",
-                  selected ? "bg-wf-muted" : "bg-wf-subtle",
-                )}
-              />
+              <button
+                type="button"
+                aria-current={selected ? "true" : undefined}
+                onClick={() => onSelect(category)}
+                className="flex h-full w-full items-center gap-3 px-5 text-left"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-10 shrink-0 rounded-wf-sm",
+                    selected ? "bg-wf-muted" : "bg-wf-subtle",
+                  )}
+                />
 
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="truncate text-sm font-bold text-wf-ink">
-                  {category.name}
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate text-sm font-bold text-wf-ink">
+                    {category.name}
+                  </span>
+                  <span className="truncate text-xs text-wf-ink-muted">
+                    /categorias/{category.slug}
+                  </span>
                 </span>
-                <span className="truncate text-xs text-wf-ink-muted">
-                  /categorias/{category.slug}
-                </span>
-              </div>
 
-              <span className="shrink-0 text-xs text-wf-ink-muted">
-                {category.productCount} productos
-              </span>
-              <span aria-hidden className="text-wf-ink-placeholder">
-                ›
-              </span>
+                <span className="shrink-0 text-xs text-wf-ink-muted">
+                  {category.productCount} productos
+                </span>
+                <span aria-hidden className="text-wf-ink-placeholder">
+                  ›
+                </span>
+              </button>
             </li>
           );
         })}

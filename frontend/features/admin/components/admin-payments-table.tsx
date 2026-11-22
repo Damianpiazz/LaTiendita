@@ -1,16 +1,35 @@
-import { PaymentStatusBadge } from "@/features/admin/components/payment-status-badge";
 import type { AdminPayments } from "@/features/admin/types";
 import { formatPrice } from "@/features/product/helpers/format-price";
 
+import { PaymentStatusBadge } from "./payment-status-badge";
+
+const SORT_OPTIONS = [
+  { value: "paidAt,desc", label: "Más recientes ↓" },
+  { value: "paidAt,asc", label: "Más antiguos ↑" },
+  { value: "amount,desc", label: "Mayor monto ↓" },
+  { value: "amount,asc", label: "Menor monto ↑" },
+];
+
+type AdminPaymentsTableProps = {
+  payments: AdminPayments;
+  search: string;
+  sort: string;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: string) => void;
+};
+
 /**
- * Payments card: header with search and sort, the 40px head and eight 64px
- * rows.
- *
- * Column widths are the frame's; the wrapper scrolls sideways under 1096px.
- * The status pill is the payments-specific one, because the settlement
- * vocabulary differs from the orders'.
+ * Payments card: header with the live search and sort, the 40px head and the
+ * mapped rows. Column widths are the frame's; the wrapper scrolls sideways
+ * under 1096px and the status pill stays payments-specific.
  */
-export function AdminPaymentsTable({ payments }: { payments: AdminPayments }) {
+export function AdminPaymentsTable({
+  payments,
+  search,
+  sort,
+  onSearchChange,
+  onSortChange,
+}: AdminPaymentsTableProps) {
   return (
     <section className="overflow-hidden rounded-wf-md border border-wf-line bg-wf-surface">
       <div className="flex flex-wrap items-center justify-between gap-4 p-5">
@@ -22,9 +41,10 @@ export function AdminPaymentsTable({ payments }: { payments: AdminPayments }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <div
+          <form
             role="search"
             className="flex h-10 w-full items-center rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 sm:w-[280px]"
+            onSubmit={(event) => event.preventDefault()}
           >
             <label htmlFor="admin-payments-search" className="sr-only">
               Buscar pagos
@@ -32,13 +52,31 @@ export function AdminPaymentsTable({ payments }: { payments: AdminPayments }) {
             <input
               id="admin-payments-search"
               type="search"
+              value={search}
+              onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Buscar por pago, pedido o cliente..."
               className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
             />
-          </div>
-          <span className="text-sm font-medium text-wf-ink-secondary">
-            Ordenar: Más recientes ↓
-          </span>
+          </form>
+          <label
+            htmlFor="admin-payments-sort"
+            className="text-sm font-medium text-wf-ink-secondary"
+          >
+            Ordenar:
+          </label>
+          <select
+            id="admin-payments-sort"
+            aria-label="Ordenar"
+            value={sort}
+            onChange={(event) => onSortChange(event.target.value)}
+            className="bg-transparent text-sm font-medium text-wf-ink-secondary outline-none"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -91,9 +129,11 @@ export function AdminPaymentsTable({ payments }: { payments: AdminPayments }) {
                 <span className="truncate font-medium text-wf-ink">
                   {payment.customer}
                 </span>
-                <span className="truncate text-xs text-wf-ink-muted">
-                  {payment.email}
-                </span>
+                {payment.email ? (
+                  <span className="truncate text-xs text-wf-ink-muted">
+                    {payment.email}
+                  </span>
+                ) : null}
               </div>
 
               <div role="cell" className="flex w-[190px] min-w-0 flex-col gap-1">

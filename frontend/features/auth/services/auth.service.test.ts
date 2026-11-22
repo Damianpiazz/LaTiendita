@@ -84,7 +84,7 @@ describe("auth service", () => {
     expect(mocks.post).toHaveBeenNthCalledWith(
       2,
       "/api/auth/skip-mfa",
-      { email: "cliente@example.com" },
+      { email: "cliente@example.com", password: "secreto" },
       { baseURL: "" },
     );
   });
@@ -129,7 +129,7 @@ describe("auth service", () => {
     expect(mocks.post).toHaveBeenNthCalledWith(
       2,
       "/api/auth/skip-mfa",
-      { email: "nueva@example.com" },
+      { email: "nueva@example.com", password: "ClaveSegura123!" },
       { baseURL: "" },
     );
   });

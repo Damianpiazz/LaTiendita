@@ -14,12 +14,14 @@ type ShippingAddressCardProps = {
  * card states the method and then asks for the address. Wireframe: white card
  * with a `border/default` hairline, radius 12, 20px padding and 20px gaps.
  */
-export function ShippingAddressCard({
-  methodName,
-  children,
-}: ShippingAddressCardProps) {
+export function ShippingAddressCard({ methodName, children }: ShippingAddressCardProps) {
   return (
     <div className="flex flex-col gap-5 rounded-wf-md border border-wf-line bg-wf-surface p-5">
+      <div className="flex flex-row items-center justify-between gap-4">
+        <p className="text-base font-bold text-wf-ink">{methodName}</p>
+      </div>
+
+      <div aria-hidden className="h-px bg-wf-line" />
 
       {children}
     </div>

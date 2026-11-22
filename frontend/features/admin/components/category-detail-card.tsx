@@ -6,15 +6,23 @@ import type { AdminCategory } from "@/features/admin/types";
 /**
  * Detail card of the selected category, 412 wide in the frame.
  *
- * The featured control persists through the catalog update endpoint; `Editar`
- * and `Eliminar` are still presentational, and the store link opens the public
- * category page.
+ * The featured control still persists through the catalog update endpoint;
+ * edit, delete and the active checkbox now call the workspace actions.
  */
 export function CategoryDetailCard({
   category,
+  onEdit,
+  onDelete,
+  onActiveChange,
 }: {
   category: AdminCategory;
+  onEdit: () => void;
+  onDelete: () => void;
+  onActiveChange: (active: boolean) => void;
 }) {
+  const activeId = `category-active-${category.id}`;
+  const imageUrl = category.imageUrl?.trim() ?? "";
+
   return (
     <aside className="flex flex-col gap-4 rounded-wf-md border border-wf-line bg-wf-surface p-5 xl:w-[412px] xl:shrink-0">
       <div className="flex items-center justify-between gap-3">
@@ -26,9 +34,19 @@ export function CategoryDetailCard({
         </span>
       </div>
 
-      <div className="flex h-[124px] items-center justify-center rounded-wf-md bg-wf-subtle text-xs text-wf-ink-subtle">
-        [ Imagen ]
-      </div>
+      {imageUrl ? (
+        // The source is an arbitrary admin URL, so the plain img keeps it exact.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt={category.name}
+          className="h-[124px] w-full rounded-wf-md object-cover"
+        />
+      ) : (
+        <div className="flex h-[124px] items-center justify-center rounded-wf-md bg-wf-subtle text-xs text-wf-ink-subtle">
+          [ Imagen ]
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-bold text-wf-ink">{category.name}</h3>
@@ -36,6 +54,19 @@ export function CategoryDetailCard({
       </div>
 
       <p className="text-sm text-wf-ink-secondary">{category.description}</p>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={activeId}
+          type="checkbox"
+          checked={category.active ?? true}
+          onChange={(event) => onActiveChange(event.target.checked)}
+          className="size-5 rounded-wf-sm border border-wf-line-strong"
+        />
+        <label htmlFor={activeId} className="text-sm text-wf-ink">
+          Categoría activa
+        </label>
+      </div>
 
       <form action={setCategoryFeatured}>
         <input type="hidden" name="categoryId" value={category.id} />
@@ -72,9 +103,13 @@ export function CategoryDetailCard({
       <div className="h-px bg-wf-line" />
 
       <div className="flex flex-col gap-2">
-        <span className="flex h-10 items-center justify-center rounded-wf-sm bg-wf-inverse text-sm font-medium text-wf-on-inverse">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex h-10 items-center justify-center rounded-wf-sm bg-wf-inverse text-sm font-medium text-wf-on-inverse transition-opacity hover:opacity-90"
+        >
           Editar categoría
-        </span>
+        </button>
         <Link
           href={`/categorias/${category.slug}`}
           className="flex h-10 items-center justify-center rounded-wf-sm border border-wf-line-strong bg-wf-surface text-sm font-medium text-wf-ink-secondary transition-colors hover:text-wf-ink"
@@ -83,9 +118,13 @@ export function CategoryDetailCard({
         </Link>
       </div>
 
-      <span className="flex h-8 items-center justify-center rounded-wf-sm border border-wf-line-strong bg-wf-surface text-xs font-medium text-wf-ink-muted">
+      <button
+        type="button"
+        onClick={onDelete}
+        className="flex h-8 items-center justify-center rounded-wf-sm border border-wf-line-strong bg-wf-surface text-xs font-medium text-wf-ink-muted transition-colors hover:text-wf-ink"
+      >
         Eliminar categoría
-      </span>
+      </button>
     </aside>
   );
 }

@@ -103,4 +103,23 @@ describe("getCustomerProfile", () => {
     expect(profile.email).toBe("bruno@example.com");
     expect(profile.initials).toBe("BD");
   });
+
+  it("re-reads the profile after a 409 instead of crashing the page", async () => {
+    const user = {
+      id: "authorizer-sub-1",
+      email: "ana@example.com",
+      givenName: "Ana",
+      familyName: "Pérez",
+      roles: ["cliente"],
+    };
+    setCookies("jwt-real", user);
+    mocks.get.mockRejectedValueOnce({ response: { status: 404 } });
+    mocks.post.mockRejectedValueOnce({ response: { status: 409 } });
+    mocks.get.mockResolvedValueOnce({ data: customerDto });
+
+    const profile = await getCustomerProfile();
+
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(profile.email).toBe("ana@example.com");
+  });
 });

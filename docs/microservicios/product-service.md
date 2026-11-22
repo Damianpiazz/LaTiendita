@@ -246,3 +246,38 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | **Admin Productos** — campos: descripción, imágenes (subida), estado | `description`, `highlights`, `images`, `specs` y `published` se envían en el `ProductDto` de `POST`/`PUT`; `featured` sigue siendo del Home. La **subida** de archivos sigue pendiente (la galería se envía como JSON de URLs/claves) | ⚠️ Campos implementados; subida: `<a implementar>` |
 | **Admin Categorías** — ABM de categorías | `POST /api/categories`, `PUT /api/categories[/{id}]`, `DELETE /api/categories/{id}`, `GET /api/categories[/{id}]`; campos `name` + `description` + `featured` | ✅ Implementado |
 | **Admin Resumen** — KPI "Stock bajo" (productos con menos de 5 unidades) | `GET /api/products/admin/low-stock?threshold=5&size=5` para el detalle y `totalLowStock` de `GET /api/products/admin/summary` para el total | ✅ Implementado |
+
+---
+
+## 8. Admin Categorías — contrato real (S2/S3/S8)
+
+Esta sección precisa el contrato de las filas de `/api/categories` de §2 y la guarda de borrado del ABM. No cambia rutas ni verbos: el gateway sigue exigiendo `hasRole("admin")` para `POST`/`PUT`/`DELETE` en `/api/categories/**` y permite `GET` público.
+
+### 8.1 `GET /api/categories?q=&featured=&page=&size=&sort=`
+
+Devuelve `Page<CategoryDto>` sin cambios de ruta ni de verbo. Cada elemento expone:
+
+| Campo | Tipo | Origen |
+| --- | --- | --- |
+| `categoryId` | string | ID numérico serializado como texto (`ToStringSerializer`) |
+| `name` | string | `name` de la categoría |
+| `slug` | string | `slug` persistido; en filas anteriores a la columna se deriva de `name` con `CategoryMapper.slugify` |
+| `description` | string\|null | `description` |
+| `featured` | boolean | flag del Home, **no** se reutiliza como `active` |
+| `active` | boolean | visibilidad en tienda; default `true` (`null` se interpreta como activo) |
+| `imageUrl` | string\|null | URL de imagen; no existe endpoint de upload para categorías (`ImageStorageService` es product-only) |
+| `productCount` | number | `productRepository.countByCategoryId` |
+| `lowStockCount` | number | productos con `quantity < 5`: mismo umbral que `/api/products/admin/low-stock` (`ProductService.LOW_STOCK_THRESHOLD`) |
+
+`q` filtra por nombre con substring case-insensitive y se combina con `featured`. Sin filtros el listado conserva el comportamiento histórico (`findAll`/`findByFeatured`). `sort` mantiene `SortValidator` y la allowlist `id`, `name`, `description`, `featured`; cualquier otra propiedad o formato responde `400` con `ProblemDetail` (`Sort inválido`).
+
+### 8.2 Escritura y persistencia
+
+- `POST /api/categories` → `201` + `Location`. Deriva el `slug` de `name` y lo guarda; acepta `active` e `imageUrl` (ausentes ⇒ `active=true`, `imageUrl=null`).
+- `PUT /api/categories[/{categoryId}]` → `200`. Actualiza `active` e `imageUrl`; conserva el `slug` persistido cuando el body no envía otro valor y lo materializa desde `name` en filas legacy con `slug` nulo.
+- `DELETE /api/categories/{categoryId}` → `204` sólo cuando `productCount = 0`. Con productos asociados responde `409` con `ProblemDetail` (`title: "Categoría en uso"`) y **no** borra ni reasigna productos; no hay borrado en cascada.
+- Esquema vía `ddl-auto=update` (sin Flyway): columnas nuevas `active` (`boolean default true`, no nula), `image_url` y `slug` (ambas anulables). Las filas existentes no cambian de visibilidad.
+
+### 8.3 Errores
+
+Se conserva el `ProblemDetail` de `GlobalExceptionHandler`: `404` para `CategoryNotFoundException`, `409` para `DuplicateCategoryException` (`Recurso duplicado`), `409` para `CategoryHasProductsException` (`Categoría en uso`), `400` para validación de Bean Validation y `400` para `InvalidSortException`.

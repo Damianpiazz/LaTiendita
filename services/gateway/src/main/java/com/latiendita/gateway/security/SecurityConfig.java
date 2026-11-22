@@ -50,6 +50,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(PUBLIC_PATHS).permitAll()
+                .requestMatchers("/api/products/admin/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**")
                     .permitAll()
                 // Las lecturas de reseñas son públicas (sección "Reviews" del detalle
@@ -67,8 +68,10 @@ public class SecurityConfig {
                 // El prefijo /admin es explícito y no debe caer en /api/customers/*.
                 .requestMatchers("/api/customers/admin/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.GET, "/api/customers/*").hasRole(ADMIN_ROLE)
+                .requestMatchers("/api/admin/promotions/**").hasRole(ADMIN_ROLE)
                 // Las consultas globales del admin de pedidos no son del cliente actual.
                 .requestMatchers("/api/orders/admin/**").hasRole(ADMIN_ROLE)
+                .requestMatchers("/api/payments/admin/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**")
                     .hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**")

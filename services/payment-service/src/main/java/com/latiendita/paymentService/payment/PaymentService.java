@@ -9,6 +9,8 @@ import com.latiendita.paymentService.exception.PaymentNotFoundException;
 import com.latiendita.paymentService.order.OrderClient;
 import com.latiendita.paymentService.order.OrderDto;
 import com.latiendita.paymentService.outbox.OutboxWriter;
+import com.latiendita.paymentService.payment.dto.AdminPaymentResponse;
+import com.latiendita.paymentService.payment.dto.AdminPaymentSummaryResponse;
 import com.latiendita.paymentService.payment.dto.CreatePaymentRequest;
 import com.latiendita.paymentService.payment.dto.PaymentMapper;
 import com.latiendita.paymentService.payment.dto.PaymentResponse;
@@ -20,14 +22,22 @@ import com.latiendita.paymentService.provider.PaymentGateway;
 import com.latiendita.paymentService.provider.PaymentGatewayFactory;
 import com.latiendita.paymentService.provider.ProviderType;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.persistence.criteria.Predicate;
+import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentService {
 
     public static final String PAYMENT_EVENTS_TOPIC = "payment-events";
+    public static final int DEFAULT_ADMIN_RANGE_DAYS = 30;
 
     private final PaymentRepository paymentRepository;
     private final OutboxWriter outboxWriter;
@@ -153,6 +164,89 @@ public class PaymentService {
             throw new PaymentAccessDeniedException(payment.getId());
         }
         return PaymentMapper.toResponse(payment);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminPaymentSummaryResponse summaryForAdmin(Integer days) {
+        CurrentUser.requireAdmin();
+        int rangeDays = normalizeRangeDays(days);
+        Instant from = Instant.now().minus(Duration.ofDays(rangeDays));
+
+        // Kept all-time: Admin Resumen consumes these two KPIs unchanged.
+        BigDecimal paymentsToClear = paymentRepository.sumAmountByStatus(PaymentStatus.APPROVED);
+        long paymentsInReview = paymentRepository.countByStatus(PaymentStatus.PENDING);
+
+        long approvedCount = paymentRepository.countByStatusSince(PaymentStatus.APPROVED, from);
+        long pendingCount = paymentRepository.countByStatusSince(PaymentStatus.PENDING, from);
+        long rejectedCount = paymentRepository.countByStatusSince(PaymentStatus.REJECTED, from);
+        long totalPayments = paymentRepository.countSince(from);
+
+        BigDecimal approvedVolume =
+                paymentRepository.sumAmountByStatusSince(PaymentStatus.APPROVED, from);
+        BigDecimal pendingVolume =
+                paymentRepository.sumAmountByStatusSince(PaymentStatus.PENDING, from);
+        BigDecimal rejectedVolume =
+                paymentRepository.sumAmountByStatusSince(PaymentStatus.REJECTED, from);
+
+        long approvalAttempts = approvedCount + rejectedCount;
+        int approvalRate = approvalAttempts == 0
+                ? 0
+                : (int) Math.round(approvedCount * 100.0 / approvalAttempts);
+
+        return new AdminPaymentSummaryResponse(
+                paymentsToClear, paymentsInReview, totalPayments,
+                approvedCount, pendingCount, rejectedCount,
+                approvedVolume, pendingVolume, rejectedVolume,
+                approvalRate, approvalAttempts, rangeDays);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminPaymentResponse> findAdminPayments(String query, PaymentStatus status,
+                                                        Integer days, Pageable pageable) {
+        CurrentUser.requireAdmin();
+        int rangeDays = normalizeRangeDays(days);
+        Instant from = Instant.now().minus(Duration.ofDays(rangeDays));
+        String textPattern = query == null || query.isBlank()
+                ? null
+                : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+
+        Specification<PaymentEntity> filters = (root, criteriaQuery, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (textPattern != null) {
+                predicates.add(builder.or(
+                        builder.like(builder.lower(root.get("externalReference")), textPattern),
+                        builder.like(builder.lower(root.get("customerId")), textPattern)));
+            }
+            if (status != null) {
+                predicates.add(builder.equal(root.get("status"), status));
+            }
+            predicates.add(builder.greaterThanOrEqualTo(root.get("createdAt"), from));
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+
+        return paymentRepository.findAll(filters, withSortAlias(pageable))
+                .map(PaymentMapper::toAdminResponse);
+    }
+
+    private static int normalizeRangeDays(Integer days) {
+        return days != null && days > 0 ? days : DEFAULT_ADMIN_RANGE_DAYS;
+    }
+
+    /**
+     * The DTO exposes the entity's {@code externalReference} as {@code orderNumber},
+     * so accept that public name in {@code sort} as well as the entity property.
+     */
+    private static Pageable withSortAlias(Pageable pageable) {
+        if (pageable == null || !pageable.isPaged() || pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+        Sort sort = Sort.by(pageable.getSort().stream()
+                .map(order -> "orderNumber".equals(order.getProperty())
+                        ? new Sort.Order(order.getDirection(), "externalReference",
+                                order.getNullHandling())
+                        : order)
+                .toList());
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
     }
 
     @Transactional

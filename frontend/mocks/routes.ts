@@ -3,7 +3,6 @@ import {
   adminCategories,
   adminNavigation,
   adminOrders,
-  adminPayments,
   adminProducts,
   adminSummary,
 } from "./data/admin";
@@ -105,11 +104,6 @@ export const mockRoutes: MockRoute[] = [
     method: "GET",
     path: "/admin/orders",
     handler: () => adminOrders,
-  },
-  {
-    method: "GET",
-    path: "/admin/payments",
-    handler: () => adminPayments,
   },
   {
     method: "GET",

@@ -5,6 +5,7 @@ import {
   authorizerRequestHeaders,
   forwardSetCookies,
   isMfaOffer,
+  rolesToElevate,
 } from "@/lib/auth/authorizer-proxy";
 import { parseAuthorizerAuth, setSessionCookies } from "@/lib/auth/session";
 import { httpClient } from "@/lib/http/client";
@@ -34,10 +35,11 @@ export async function POST(request: Request) {
   }
 
   try {
+    const requestHeaders = authorizerRequestHeaders(request);
     const { data, headers } = await httpClient.post<unknown>(
       "/api/auth/login",
       { email, password },
-      { headers: authorizerRequestHeaders(request) },
+      { headers: requestHeaders },
     );
 
     if (isMfaOffer(data)) {
@@ -51,7 +53,18 @@ export async function POST(request: Request) {
       return response;
     }
 
-    const session = parseAuthorizerAuth(data);
+    const elevatedRoles = rolesToElevate(data);
+    const authPayload = elevatedRoles
+      ? (
+          await httpClient.post<unknown>(
+            "/api/auth/login",
+            { email, password, roles: elevatedRoles },
+            { headers: requestHeaders },
+          )
+        ).data
+      : data;
+
+    const session = parseAuthorizerAuth(authPayload);
     const response = NextResponse.json({ user: session.user });
 
     setSessionCookies(response, session);

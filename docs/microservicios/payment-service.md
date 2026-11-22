@@ -18,6 +18,8 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://paymentServic
 | `POST` | `/api/payments` | Crea el pago de un pedido: genera la preferencia en el proveedor y devuelve la `checkoutUrl` | `CreatePaymentRequest` | `201` PaymentResponse (+ header `Location`) | Sí |
 | `GET` | `/api/payments/{paymentId}` | Obtiene un pago por su ID | — | `200` PaymentResponse | Sí |
 | `GET` | `/api/payments` | Pagos del cliente autenticado (paginado: `page`, `size`, `sort`) | — | `200` Page&lt;PaymentResponse&gt; | Sí |
+| `GET` | `/api/payments/admin` | Listado admin de todos los pagos: `q` (orderNumber o customerId, case-insensitive), `status`, `days` (default `30`) y `page`/`size`/`sort` | — | `200` Page&lt;AdminPaymentResponse&gt; | Sí (rol `admin`) |
+| `GET` | `/api/payments/admin/summary` | KPIs admin del rango solicitado (`days`, default `30`) | — | `200` AdminPaymentSummaryResponse | Sí (rol `admin`) |
 | `GET` | `/api/payments/order/{orderId}` | Pago asociado a un pedido | — | `200` PaymentResponse | Sí |
 | `GET` | `/api/payments/reference/{externalReference}` | Resuelve el pago por `orderNumber`; lo usan las *back_urls* de Mercado Pago (`?external_reference=<orderNumber>`) | — | `200` PaymentResponse | Sí |
 | `POST` | `/api/webhooks/mercado-pago` | Notificación de Mercado Pago (webhook/IPN) | `WebhookNotification` (body) + headers `x-signature`, `x-request-id` + query `data.id`, `type` | `200` (vacío) | No (firma HMAC-SHA256) |
@@ -25,6 +27,7 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://paymentServic
 Notas de identidad y trazabilidad:
 
 - El gateway valida el JWT (Authorizer) y propaga `X-User-Id`, `X-User-Email` y `X-User-Roles`; este servicio lee la identidad con el patrón `CurrentUser` (sin `X-User-Id` → `401`). Los headers de identidad se pisan siempre con los claims del token.
+- Los dos endpoints `/api/payments/admin/**` aplican `CurrentUser.requireAdmin()` en la capa de servicio: sin `X-User-Roles: admin` responden `403` con `ProblemDetail`. El gateway no cambió; el control de acceso de pagos sigue viviendo dentro del servicio.
 - `X-Correlation-Id` se propaga de punta a punta (`CorrelationIdFilter` + `CorrelationIdInterceptor`).
 - `/api/webhooks/**` está excluido del *rate limiting* del gateway (Mercado Pago no lleva JWT).
 
@@ -54,7 +57,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 |---|---|---|---|
 | `400` | Bad Request | Validación de campos falla (o monto del proveedor inconsistente) | `El monto informado por el proveedor (100.00) no coincide con el monto registrado (150.00)` |
 | `401` | Unauthorized | Falta `X-User-Id` (la petición no pasó por el gateway) | `Falta o es inválido el header 'X-User-Id'; la petición debe pasar por el Gateway` |
-| `403` | Forbidden | El pago pertenece a otro cliente | `No tiene permiso sobre el pago 7` |
+| `403` | Forbidden | El pago pertenece a otro cliente, o la petición admin no tiene rol `admin` | `No tiene permiso sobre el pago 7` / `Se requiere el rol 'admin' para esta operación` |
 | `404` | Not Found | Pago o pedido inexistente | `Pago no encontrado con id 42` / `Pedido no encontrado con id 42` |
 | `409` | Conflict | Pedido ya pagado, transición inválida o carrera de concurrencia | `El pedido 42 ya tiene un pago aprobado` / `No se puede pasar de APPROVED a REJECTED` |
 | `422` | Unprocessable | Entidad válida pero no procesable | *(sin uso actual)* |
@@ -140,6 +143,8 @@ Campos derivados de la entidad de §4.1 y de lo que consumen las pantallas de §
 |---|---|---|---|
 | `CreatePaymentRequest` | `POST /api/payments` | `orderId` | El monto no se acepta del cliente: se toma de `order.total` |
 | `PaymentResponse` | `POST /api/payments`, `GET /api/payments[/{id}\|/order/{orderId}\|/reference/{externalReference}]` | `id`, `orderId`, `customerId`, `provider`, `status`, `amount`, `currency`, `preferenceId`, `checkoutUrl`, `externalReference`, `providerPaymentId`, `paymentMethodId`, `paymentType`, `statusDetail`, `paidAt`, `expiresAt`, `createdAt`, `updatedAt` | `checkoutUrl` alimenta el paso "Pago" (§7); `status`, `amount` y `paidAt` alimentan Admin Pagos (§7:220) |
+| `AdminPaymentResponse` | `GET /api/payments/admin` | `id`, `orderNumber`, `customerId`, `provider`, `paymentMethodId`, `paymentType`, `paidAt`, `amount`, `status` | `orderNumber` es `externalReference`; `status` se expone como enum (`APPROVED`/`PENDING`/`REJECTED`/…). La entidad no guarda nombre ni email del cliente: no se inventan (S4) |
+| `AdminPaymentSummaryResponse` | `GET /api/payments/admin/summary` | `paymentsToClear`, `paymentsInReview`, `totalPayments`, `approvedCount`, `pendingCount`, `rejectedCount`, `approvedVolume`, `pendingVolume`, `rejectedVolume`, `approvalRate`, `approvalAttempts`, `rangeDays` | Extensión aditiva: los dos primeros conservan su valor *all-time* para Admin Resumen; el resto se calcula en la ventana `days` |
 
 ---
 
@@ -226,9 +231,15 @@ Consumidor existente: `order-service` (`PaymentApprovedConsumer`) reacciona a `P
 |---|---|
 | **Checkout — paso "Pago"** (tras "Continuar al pago" del resumen de envío) | `POST /api/payments` crea el pago del pedido y devuelve `checkoutUrl` para redirigir al proveedor; `GET /api/payments/reference/{orderNumber}` resuelve el pago en las páginas de retorno; `POST /api/webhooks/mercado-pago` confirma la aprobación y publica `PAYMENT_APPROVED` |
 | **Checkout — estados del pago y confirmación hacia el pedido** | Transiciones de `PaymentStatus` y mapeo del proveedor con `MercadoPagoStatusMapper` (`approved`, `rejected`, `cancelled`, `expired`, `pending/authorized/in_process/in_mediation`); eventos `PAYMENT_APPROVED` / `PAYMENT_REJECTED` / `PAYMENT_CANCELLED` en `payment-events` |
-| **Admin Pagos — tabla/lista de pagos con estados** | `GET /api/payments` devuelve `Page<PaymentResponse>` con `status`, `amount` y `paidAt`. **Gap:** hoy el listado se filtra por el cliente autenticado (`CurrentUser`); falta el endpoint de listado para admin (filtrado por `X-User-Roles: admin`) |
-| **Admin Pagos — KPI "Pagos a acreditar: $86.400 · 3 pagos en revisión"** | **Gap:** no existe endpoint agregado. Se propone `GET /api/payments/admin/summary` (sumatoria de `APPROVED` pendientes de acreditar + conteo de `PENDING` como "en revisión") |
+| **Admin Pagos — tabla/lista de pagos con estados** | `GET /api/payments/admin` devuelve `Page<AdminPaymentResponse>` de **todos** los clientes con `q` sobre `orderNumber`/`customerId` (case-insensitive), `status`, `days` sobre `createdAt` (default `30`) y paginación Spring 0-based (`page`, `size`, `sort`). `sort=orderNumber` es alias de la columna `externalReference`; también acepta propiedades de la entidad (`createdAt`, `paidAt`, `amount`, …). Sin rol `admin` → `403`. `GET /api/payments` sigue limitado al cliente autenticado |
+| **Admin Pagos — KPIs "Cobrado (30 días)", "Pendiente de acreditación", "Rechazados", "Tasa de aprobación"** | `GET /api/payments/admin/summary?days=30` devuelve conteos y volúmenes por estado dentro de la ventana, más `approvalAttempts = approvedCount + rejectedCount` y `approvalRate = round(approvedCount / approvalAttempts * 100)` (entero). `paymentsToClear` (suma de `APPROVED`) y `paymentsInReview` (conteo de `PENDING`) se mantienen *all-time* y sin cambios para Admin Resumen |
 | **Admin Resumen — KPI "Pagos a acreditar" y "Pedidos pendientes — 4 sin pago acreditado"** | Pagos a acreditar: mismo endpoint admin propuesto. Pedidos sin acreditar: corresponde a pedidos en `PENDING` en `order-service`; este servicio aporta el estado real del pago que los explica |
 | **Admin Pedidos — estados del pedido derivados del pago (`Pendiente` → `Pagado`)** | `PAYMENT_APPROVED` → `PaymentApprovedConsumer` (order-service) cambia `PENDING` → `PAID`; `PAYMENT_REJECTED`/`PAYMENT_CANCELLED` quedan publicados para los efectos aún no implementados (notificación/reintento) |
+
+Notas de integración de Admin Pagos:
+
+- La paginación es 0-based en Spring; la UI convierte su página 1-based con `Math.max(0, uiPage - 1)`.
+- El rango de días filtra por `createdAt` (campo siempre presente); `rangeDays` devuelve el valor efectivo aplicado. Un `days` ausente, `0` o negativo usa el default `30` (`PaymentService.DEFAULT_ADMIN_RANGE_DAYS`).
+- En el listado no se expone nombre ni email del cliente: `PaymentEntity` no los persiste y no se agregó una llamada a `customer-service`.
 
 Nota de integración: el monto cobrado es `order.total`, que hoy suma solo los ítems del pedido (ver nota de integración en `shipment-service.md`).

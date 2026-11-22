@@ -41,6 +41,29 @@ public class CategoryEntity {
     private String description;
 
     /**
+     * Slug guardado para no romper enlaces existentes al editar el nombre. Las
+     * filas creadas antes de esta columna lo tienen nulo: se serializan con el
+     * slug derivado y se materializan lazily al editarlas.
+     */
+    @Size(max = 255)
+    @Column(name = "slug", length = 255)
+    private String slug;
+
+    /**
+     * Visibilidad en la tienda, independiente de `featured` (que es sólo Home).
+     * El default en Java cubre entidades nuevas y el default de la columna
+     * backfillea con `true` las filas existentes cuando ddl-auto=update la añade.
+     */
+    @Builder.Default
+    @Column(name = "active", nullable = false, columnDefinition = "boolean default true")
+    private boolean active = true;
+
+    /** URL de imagen de la categoría; `null` cuando el admin no carga ninguna. */
+    @Size(max = 500)
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
+    /**
      * Categoría destacada en la Home. El default en Java cubre las entidades
      * nuevas y el default de la columna cubre las filas ya existentes cuando
      * Hibernate aplica `ddl-auto=update` (único mecanismo de esquema del repo).

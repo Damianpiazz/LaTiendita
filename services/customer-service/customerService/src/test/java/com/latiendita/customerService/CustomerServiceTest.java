@@ -119,16 +119,37 @@ class CustomerServiceTest {
     }
 
     @Test
-    void shouldRejectDuplicateEmailForAnotherSub() {
-        when(customerRepository.findByAuthorizerSubAndDeletedAtIsNull(SUB)).thenReturn(Optional.empty());
+    void shouldReclaimOrphanedCustomerWhenSubChangesAfterAccountRecreation() {
+        CustomerEntity orphan = existingCustomer();
+        orphan.setAuthorizerSub("auth0|old-sub");
+        String newSub = CurrentUser.id();
+
+        when(customerRepository.findByAuthorizerSubAndDeletedAtIsNull(newSub)).thenReturn(Optional.empty());
+        when(customerRepository.existsByEmailAndDeletedAtIsNull(EMAIL)).thenReturn(true);
+        when(customerRepository.findByEmailAndDeletedAtIsNull(EMAIL)).thenReturn(Optional.of(orphan));
+        when(customerRepository.save(orphan)).thenReturn(orphan);
+
+        CustomerCreation result = customerService.create(
+                new CreateCustomerRequest(newSub, EMAIL, "Ana", "Diaz", "555-1234"));
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.customer().id()).isEqualTo(orphan.getId());
+        assertThat(orphan.getAuthorizerSub()).isEqualTo(newSub);
+        verifyNoInteractions(outboxWriter);
+    }
+
+    @Test
+    void shouldNotReclaimFromBodyEmailWhenGatewayDidNotSendTrustedClaim() {
+        setGatewayHeaders("auth0|other-456", null);
+        when(customerRepository.findByAuthorizerSubAndDeletedAtIsNull("auth0|other-456"))
+                .thenReturn(Optional.empty());
         when(customerRepository.existsByEmailAndDeletedAtIsNull(EMAIL)).thenReturn(true);
 
         assertThatThrownBy(() -> customerService.create(
-                new CreateCustomerRequest(SUB, EMAIL, "Ana", "Diaz", null)))
-                .isInstanceOf(DuplicateEmailException.class)
-                .hasMessageContaining("Email already registered");
+                new CreateCustomerRequest("auth0|other-456", EMAIL, "Ana", "Diaz", null)))
+                .isInstanceOf(DuplicateEmailException.class);
+        verify(customerRepository, never()).findByEmailAndDeletedAtIsNull(anyString());
         verify(customerRepository, never()).save(any());
-        verifyNoInteractions(outboxWriter);
     }
 
     @Test
@@ -192,7 +213,9 @@ class CustomerServiceTest {
     private void setGatewayHeaders(String sub, String email) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(CurrentUser.ID_HEADER, sub);
-        request.addHeader(CurrentUser.EMAIL_HEADER, email);
+        if (email != null) {
+            request.addHeader(CurrentUser.EMAIL_HEADER, email);
+        }
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 

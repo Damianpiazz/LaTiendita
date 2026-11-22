@@ -3,20 +3,24 @@ import { CheckoutSteps } from "@/features/checkout";
 import { Breadcrumbs } from "@/features/product/components/breadcrumbs";
 import { getProducts } from "@/features/product/services/catalog.service";
 import { ShippingView } from "@/features/shipment/components/shipping-view";
-import { getShippingMethods } from "@/features/shipment/services/shipping.service";
+import {
+  getShippingAddresses,
+  getShippingMethods,
+} from "@/features/shipment/services/shipping.service";
 
 /**
  * `Checkout Shipping Wireframe` of the design file.
  *
- * The catalog and the shipping methods arrive through the cached services, so
- * the screen follows the same mock (or real) API as the rest of the store; the
- * cart totals are the client store.
+ * The catalog comes from the real catalog service; delivery addresses come from
+ * the real shipment-service when the user is authenticated.
  */
 export async function ShippingPage() {
-  const [products, methods] = await Promise.all([
+  const [products, methods, addresses] = await Promise.all([
     getProducts(),
     getShippingMethods(),
+    getShippingAddresses(),
   ]);
+  const [method] = methods;
 
   return (
     <>
@@ -35,7 +39,11 @@ export async function ShippingPage() {
 
           <h1 className="text-2xl font-bold text-wf-ink">Envío</h1>
 
-          <ShippingView products={products} methods={methods} />
+          <ShippingView
+            products={products}
+            addresses={addresses}
+            methodName={method?.name ?? "Envío a domicilio"}
+          />
         </div>
       </section>
 

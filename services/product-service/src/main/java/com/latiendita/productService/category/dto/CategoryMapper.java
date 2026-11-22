@@ -8,22 +8,36 @@ public final class CategoryMapper {
 
     private CategoryMapper() {}
 
-    /** Kept for callers that do not need a product count. */
+    /** Kept for callers that do not need product counts. */
     public static CategoryDto toDto(CategoryEntity entity) {
-        return toDto(entity, 0L);
+        return toDto(entity, 0L, 0L);
     }
 
+    /** Kept for callers that do not need a low-stock count. */
     public static CategoryDto toDto(CategoryEntity entity, long productCount) {
+        return toDto(entity, productCount, 0L);
+    }
+
+    public static CategoryDto toDto(CategoryEntity entity, long productCount, long lowStockCount) {
         return new CategoryDto(
                 entity.getId(),
                 entity.getName(),
                 entity.getDescription(),
-                slugify(entity.getName()),
+                resolveSlug(entity),
                 entity.isFeatured(),
-                productCount);
+                productCount,
+                entity.isActive(),
+                entity.getImageUrl(),
+                lowStockCount);
     }
 
-    /** Categories have no stored slug yet: derive it the same way product slugs are derived. */
+    /** The stored slug wins; legacy rows with a null slug use the derived one. */
+    public static String resolveSlug(CategoryEntity entity) {
+        String stored = entity.getSlug();
+        return stored != null && !stored.isBlank() ? stored : slugify(entity.getName());
+    }
+
+    /** Derives a URL-safe slug from a category name, products' convention. */
     public static String slugify(String name) {
         if (name == null || name.isBlank()) {
             return "categoria";

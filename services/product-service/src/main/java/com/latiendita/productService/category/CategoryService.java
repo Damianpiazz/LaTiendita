@@ -2,9 +2,11 @@ package com.latiendita.productService.category;
 
 import com.latiendita.productService.category.dto.CategoryDto;
 import com.latiendita.productService.category.dto.CategoryMapper;
+import com.latiendita.productService.exception.CategoryHasProductsException;
 import com.latiendita.productService.exception.CategoryNotFoundException;
 import com.latiendita.productService.exception.DuplicateCategoryException;
 import com.latiendita.productService.product.ProductRepository;
+import com.latiendita.productService.product.ProductService;
 import com.latiendita.productService.sort.SortValidator;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,9 @@ public class CategoryService {
                 .name(dto.name())
                 .description(dto.description())
                 .featured(dto.featured())
+                .slug(CategoryMapper.slugify(dto.name()))
+                .active(dto.active())
+                .imageUrl(dto.imageUrl())
                 .build());
 
         return toDto(saved);
@@ -55,24 +60,49 @@ public class CategoryService {
         category.setName(dto.name());
         category.setDescription(dto.description());
         category.setFeatured(dto.featured());
+        category.setActive(dto.active());
+        category.setImageUrl(dto.imageUrl());
+        category.setSlug(resolveUpdatedSlug(category, dto));
 
         CategoryEntity saved = categoryRepository.save(category);
 
         return toDto(saved);
     }
 
-    @Transactional(readOnly = true)
-    public Page<CategoryDto> findAll(Pageable pageable) {
-        return findAll(null, pageable);
+    /** An explicit slug wins; otherwise keep the stored one or materialize it. */
+    private String resolveUpdatedSlug(CategoryEntity category, CategoryDto dto) {
+        if (dto.slug() != null && !dto.slug().isBlank()) {
+            return dto.slug();
+        }
+        return CategoryMapper.resolveSlug(category);
     }
 
-    /** Sin filtro se conserva el listado histórico; con filtro se aplica `featured` en la BD. */
+    @Transactional(readOnly = true)
+    public Page<CategoryDto> findAll(Pageable pageable) {
+        return findAll(null, null, pageable);
+    }
+
+    /** Sin filtro se conserva el listado histórico; con filtro se aplica en la BD. */
     @Transactional(readOnly = true)
     public Page<CategoryDto> findAll(Boolean featured, Pageable pageable) {
+        return findAll(null, featured, pageable);
+    }
+
+    /**
+     * `q` busca por nombre (substring, sin distinguir mayúsculas) y se puede
+     * combinar con `featured`. Sin filtros se usan los repositorios históricos.
+     */
+    @Transactional(readOnly = true)
+    public Page<CategoryDto> findAll(String q, Boolean featured, Pageable pageable) {
         SortValidator.validate(pageable.getSort(), SORTABLE_PROPERTIES);
-        Page<CategoryEntity> categories = featured == null
-                ? categoryRepository.findAll(pageable)
-                : categoryRepository.findByFeatured(featured, pageable);
+        Page<CategoryEntity> categories;
+        if (q == null || q.isBlank()) {
+            categories = featured == null
+                    ? categoryRepository.findAll(pageable)
+                    : categoryRepository.findByFeatured(featured, pageable);
+        } else {
+            categories = categoryRepository.search(q.trim(), featured, pageable);
+        }
         return categories.map(this::toDto);
     }
 
@@ -99,7 +129,7 @@ public class CategoryService {
     @Transactional(readOnly = true)
     public CategoryDto findBySlug(String slug) {
         CategoryEntity category = categoryRepository.findAll().stream()
-                .filter(entity -> CategoryMapper.slugify(entity.getName()).equals(slug))
+                .filter(entity -> CategoryMapper.resolveSlug(entity).equals(slug))
                 .findFirst()
                 .orElseThrow(() -> new CategoryNotFoundException(slug));
         return toDto(category);
@@ -114,16 +144,26 @@ public class CategoryService {
         return findBySlug(idOrSlug);
     }
 
+    /** Borrado protegido: con productos asociados responde 409 y no toca nada. */
     public void delete(Long id) {
         CategoryEntity category = findEntity(id);
+        long productCount = productRepository.countByCategoryId(id);
+        if (productCount > 0) {
+            throw new CategoryHasProductsException(category.getName(), productCount);
+        }
         categoryRepository.delete(category);
     }
 
     private CategoryDto toDto(CategoryEntity entity) {
-        long productCount = entity.getId() == null
-                ? 0L
-                : productRepository.countByCategoryId(entity.getId());
-        return CategoryMapper.toDto(entity, productCount);
+        boolean persisted = entity.getId() != null;
+        long productCount = persisted
+                ? productRepository.countByCategoryId(entity.getId())
+                : 0L;
+        long lowStockCount = persisted
+                ? categoryRepository.countLowStockByCategoryId(
+                        entity.getId(), ProductService.LOW_STOCK_THRESHOLD)
+                : 0L;
+        return CategoryMapper.toDto(entity, productCount, lowStockCount);
     }
 
     private CategoryEntity findEntity(Long id) {

@@ -80,6 +80,7 @@ class GatewayRoutingIntegrationTest {
         registry.add("PAYMENT_SERVICE_BASE_URL", () -> base);
         registry.add("REVIEW_SERVICE_BASE_URL", () -> base);
         registry.add("CUSTOMER_SERVICE_BASE_URL", () -> base);
+        registry.add("OFFER_SERVICE_BASE_URL", () -> base);
     }
 
     @Autowired
@@ -211,6 +212,44 @@ class GatewayRoutingIntegrationTest {
     }
 
     @Test
+    void rechazaConTokenSinRolAdminElResumenAdminDePagos() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/payments/admin/summary", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteConRolAdminElResumenAdminDePagos() {
+        String token = TestJwtFactory.token(42, "admin");
+        ResponseEntity<String> response = rest.exchange("/api/payments/admin/summary", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastRequestPath).isEqualTo("/api/payments/admin/summary");
+    }
+
+    @Test
+    void rechazaConTokenSinRolAdminElStockBajoAdminDeProductos() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/products/admin/low-stock", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteConRolAdminElStockBajoAdminDeProductos() {
+        String token = TestJwtFactory.token(42, "admin");
+        ResponseEntity<String> response = rest.exchange("/api/products/admin/low-stock", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastRequestPath).isEqualTo("/api/products/admin/low-stock");
+    }
+
+    @Test
     void rechazaAlClienteElListadoAdminDeCustomers() {
         String token = TestJwtFactory.token(42, "cliente");
         ResponseEntity<String> response = rest.exchange("/api/customers", HttpMethod.GET,
@@ -255,6 +294,40 @@ class GatewayRoutingIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(lastRequestPath).isEqualTo("/api/customers/me");
+    }
+
+    @Test
+    void rechazaAlClienteLaAdministracionDePromociones() {
+        String token = TestJwtFactory.token(42, "cliente");
+        ResponseEntity<String> response = rest.exchange("/api/admin/promotions", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void permiteAlAdminLaAdministracionDePromociones() {
+        String token = TestJwtFactory.token(42, "admin");
+        ResponseEntity<String> response = rest.exchange("/api/admin/promotions", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastRequestPath).isEqualTo("/api/admin/promotions");
+    }
+
+    @Test
+    void noExponeElAdminDeAuthorizerDetrasDeLaRutaDeAuth() {
+        lastRequestPath = null;
+        lastUserHeader = null;
+
+        ResponseEntity<String> response = rest.postForEntity("/api/auth/admin/user",
+                new HttpEntity<>(new HttpHeaders()), String.class);
+
+        // Sin ruta de gateway: no se reescribe a /v1/admin/user ni llega al stub.
+        // El forward al /error protegido puede terminar en 401 o en 404; en
+        // cualquier caso no es una respuesta 2xx del API admin de Authorizer.
+        assertThat(response.getStatusCode().is4xxClientError()).isTrue();
+        assertThat(lastRequestPath).isNull();
     }
 
     @Test

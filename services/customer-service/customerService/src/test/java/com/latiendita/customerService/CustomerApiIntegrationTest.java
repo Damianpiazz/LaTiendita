@@ -101,7 +101,7 @@ class CustomerApiIntegrationTest {
     }
 
     @Test
-    void shouldRejectDuplicateEmailWith409ProblemDetail() throws Exception {
+    void shouldRejectBodySuppliedDuplicateEmailWithoutTrustedClaim() throws Exception {
         String firstBody = """
                 {"authorizerSub":"auth0|abc-123","email":"ana@mail.com",\
                 "firstName":"Ana","lastName":"Diaz"}
@@ -113,14 +113,41 @@ class CustomerApiIntegrationTest {
                         .content(firstBody))
                 .andExpect(status().isCreated());
 
+        // Without the gateway's email claim, the body email is untrusted: a
+        // different sub must never be able to steal the existing profile.
         mockMvc.perform(post("/api/customers")
                         .header("X-User-Id", "auth0|other-456")
-                        .header("X-User-Email", EMAIL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(firstBody))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Conflict"))
                 .andExpect(jsonPath("$.detail").value(containsString("Email already registered")));
+    }
+
+    @Test
+    void shouldReclaimProfileWhenAccountWasRecreatedWithSameTrustedEmail() throws Exception {
+        String body = """
+                {"authorizerSub":"ignored","email":"ana@mail.com",\
+                "firstName":"Ana","lastName":"Diaz"}
+                """;
+        String firstLocation = mockMvc.perform(post("/api/customers")
+                        .header("X-User-Id", SUB)
+                        .header("X-User-Email", EMAIL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+
+        // Authorizer deleted and recreated the account: same trusted email, new sub.
+        mockMvc.perform(post("/api/customers")
+                        .header("X-User-Id", "auth0|new-sub-after-reset")
+                        .header("X-User-Email", EMAIL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Location", firstLocation))
+                .andExpect(jsonPath("$.authorizerSub").value("auth0|new-sub-after-reset"))
+                .andExpect(jsonPath("$.email").value(EMAIL));
     }
 
     @Test

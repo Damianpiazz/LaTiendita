@@ -25,4 +25,17 @@ public final class PaymentMapper {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());
     }
+
+    public static AdminPaymentResponse toAdminResponse(PaymentEntity entity) {
+        return new AdminPaymentResponse(
+                entity.getId(),
+                entity.getExternalReference(),
+                entity.getCustomerId(),
+                entity.getProvider(),
+                entity.getPaymentMethodId(),
+                entity.getPaymentType(),
+                entity.getPaidAt(),
+                entity.getAmount(),
+                entity.getStatus());
+    }
 }

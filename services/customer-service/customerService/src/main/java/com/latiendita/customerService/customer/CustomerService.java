@@ -42,17 +42,24 @@ public class CustomerService {
      */
     public CustomerCreation create(CreateCustomerRequest request) {
         String sub = CurrentUser.id();
-        String email = resolveEmail(request.email());
+        String trustedEmail = CurrentUser.email();
+        String email = resolveEmail(trustedEmail, request.email());
 
         Optional<CustomerEntity> existing = customerRepository.findByAuthorizerSubAndDeletedAtIsNull(sub);
         if (existing.isPresent()) {
             return new CustomerCreation(CustomerMapper.toDto(existing.get()), false);
         }
+        Instant now = Instant.now();
         if (customerRepository.existsByEmailAndDeletedAtIsNull(email)) {
-            throw new DuplicateEmailException(email);
+            // Reclaiming by email is only safe when the email came from the JWT
+            // claim the gateway injected. A body-supplied email is untrusted and
+            // could otherwise steal another customer's profile.
+            if (trustedEmail == null) {
+                throw new DuplicateEmailException(email);
+            }
+            return reclaimByEmail(email, sub, request, now);
         }
 
-        Instant now = Instant.now();
         CustomerEntity customer = CustomerEntity.builder()
                 .authorizerSub(sub)
                 .email(email)
@@ -139,14 +146,33 @@ public class CustomerService {
         return CustomerMapper.toNewsletterDto(customer);
     }
 
+    /**
+     * Reclaims a profile orphaned when Authorizer recreates an account: the
+     * email is the same but the trusted {@code sub} changed. Failing here would
+     * turn the customer's next login into an unrecoverable 409.
+     */
+    private CustomerCreation reclaimByEmail(
+            String email, String sub, CreateCustomerRequest request, Instant now) {
+        CustomerEntity customer = customerRepository.findByEmailAndDeletedAtIsNull(email)
+                .orElseThrow(() -> new DuplicateEmailException(email));
+
+        customer.setAuthorizerSub(sub);
+        customer.setFirstName(request.firstName());
+        customer.setLastName(request.lastName());
+        customer.setPhone(request.phone());
+        customer.setLastLoginAt(now);
+        customer.setUpdatedAt(now);
+
+        return new CustomerCreation(CustomerMapper.toDto(customerRepository.save(customer)), false);
+    }
+
     private CustomerEntity requireBySub(String sub) {
         return customerRepository.findByAuthorizerSubAndDeletedAtIsNull(sub)
                 .orElseThrow(() -> new CustomerNotFoundException(sub));
     }
 
-    private String resolveEmail(String requestEmail) {
-        String headerEmail = CurrentUser.email();
-        return headerEmail != null ? headerEmail : requestEmail;
+    private String resolveEmail(String trustedEmail, String requestEmail) {
+        return trustedEmail != null ? trustedEmail : requestEmail;
     }
 
     private boolean hasText(String value) {

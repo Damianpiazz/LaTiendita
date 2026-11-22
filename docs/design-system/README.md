@@ -135,6 +135,49 @@ Inventario medido en el documento (clusters con ≥ 2 repeticiones):
 | `Detail panel` | 412 de ancho, padding 20, radio 12 | `background/surface`, `border/default`, acción primaria + outline |
 | `Status tabs` | alto 40, radio full, padding X 16, contador 12/700 | activa: `background/inverse` + `text/on-inverse` · inactiva: `border/strong` + contador `text/muted` |
 | `Chart placeholder` | barras 48 de ancho, alto variable, radio 8 | `background/subtle`, barra del día actual en `background/inverse` |
+| `Modal/Product form` | card 640 × 809, padding 32, gap 24, radio 12 | `background/surface`, `border/default`, galería 80 × 80, input 40 de alto radio 8, checkbox 20 |
+| `Modal/Confirm action` | card 480 × hug, padding 32, gap 24, radio 12 | `background/canvas` en el bloque de mensaje, footer con botón inverse |
+
+### 3.1 Componentes nuevos de Admin Productos
+
+El wireframe `Admin Productos Wireframe` (`0:1768`) no definía los diálogos de
+alta/edición ni la confirmación de acciones masivas. Se diseñaron en la page
+`WireFrame` (`0:3`) del `.fig`, con los tokens de este documento:
+
+| Componente | Frame | Medidas | Estructura |
+|---|---|---|---|
+| `Modal/Product form` | `566369648:156` | 640 × 809, padding 32, gap 24, radio 12 | Header (título 24/700 + subtítulo 14 + cerrar 18), galería `Imágenes` con tres placeholders de 80 × 80 y control `+` (la primera es la principal), campos Nombre/SKU/Categoría, fila Precio + Stock, textarea de 72, checkbox `Publicado`, divisor y footer con `Cancelar` (120 × 40 outline) + `Guardar` (160 × 40 inverse). La variante de edición (`566369648:213`) precarga los valores y cambia el label del botón a `Guardar cambios`. |
+| `Modal/Confirm action` | `566369648:133` | 480 × hug, padding 32, gap 24, radio 12 | Header con título 24/700 y subtítulo 14, bloque de mensaje sobre `background/canvas` con titular 16/500 y detalle 14, nota aclaratoria 12 y footer con `Cancelar` + botón de confirmación. |
+
+Los tres comparten el scrub `background/inverse` al 45 % sobre el canvas y
+respetan la escala de grises: no hay color de marca, sombras ni degradés.
+
+Los form cards miden 809 px y quedan centrados dentro del frame de 1440 × 974,
+con 82,5 px libres arriba y abajo; se verificó con `node_bounds` que ningún nodo
+se sale del frame contenedor. La galería expresa que un producto puede tener
+múltiples imágenes: el contrato `ProductDto.images` acepta hasta 10 referencias y
+la primera se trata como principal. No se dibujó un flujo de upload porque el
+endpoint de subida sigue pendiente en el servicio de almacenamiento.
+
+### 3.2 Componentes nuevos de Admin Categorías
+
+El wireframe `Admin Categorias Wireframe` (`0:2076`, 1440 × 828) ya mostraba los
+botones `Nueva categoría` y `Editar categoría` y la acción `Eliminar categoría`
+en el panel de detalle. Se completaron los tres destinos en la page `WireFrame`
+(`0:3`), en frames debajo de esa pantalla, alineados en x = 16702 y separados 48 px:
+
+| Componente | Frame | Medidas | Estructura |
+|---|---|---|---|
+| `Modal/Category form` (alta) | `566369648:276` | 1440 × 828 (card 640 × 686) | Scrim `background/inverse` al 45 %; card con padding 32, gap 24 y radio 12. Header con título 24/700, subtítulo 14 y cerrar 18; campo `Imagen` con placeholder 96 × 96 `[ Imagen ]` y hint de formato; `Nombre *`, `Slug *` (hint de generación) y `Descripción` (textarea 72); checkbox `Categoría activa`; divisor y footer con `Cancelar` (120 × 40 outline) + `Crear categoría` (176 × 40 inverse). |
+| `Modal/Category form` (edición) | `566369648:318` | 1440 × 828 (card 640 × 686) | Misma estructura, precargada con `Remeras`, `/categorias/remeras` y la descripción del panel de detalle. El hint del slug aclara que se mantiene para no romper links; el botón final pasa a `Guardar cambios`. |
+| `Modal/Confirm delete category` | `566369648:358` | 1440 × 828 (card 480 × 368) | Header con título 24/700 y subtítulo 14; bloque de mensaje sobre `background/canvas` con titular 16/500 y detalle del impacto (14 productos pasan a `Sin categoría` y la URL deja de estar disponible); nota 12 con el aviso de irreversible; footer con `Cancelar` + `Eliminar categoría`. |
+
+Los tres comparten la escala gris de `Admin Productos`: sin color de marca,
+sombras ni degradés; tipografía Inter, radios 8/12 y espaciados 4/8/12/16/24/32.
+Los cards quedan centrados dentro del frame de 1440 × 828 y se verificó con
+`node_bounds` que ningún nodo se sale del contenedor. La acción destructiva no
+introduce un token de color nuevo: mantiene el botón primario inverse y traslada
+la advertencia al copy, porque el wireframe todavía no define un token `danger`.
 
 ---
 

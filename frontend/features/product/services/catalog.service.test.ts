@@ -53,6 +53,9 @@ describe("catalog service adapter", () => {
     );
 
     expect(await getCategories({ featured: true })).toHaveLength(1);
+    expect(get).toHaveBeenCalledWith("/api/categories", {
+      params: { size: 100, featured: true },
+    });
 
     get.mockImplementationOnce(async () =>
       response({
@@ -71,6 +74,36 @@ describe("catalog service adapter", () => {
     );
 
     expect(await getProducts()).toHaveLength(1);
+  });
+
+  it("requests a full category listing for the category screen", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () =>
+      response({
+        content: [
+          {
+            productId: "10",
+            title: "Auriculares",
+            price: "25999",
+            categoryId: "1",
+            categoryName: "Tecnología",
+            subcategory: "Audio",
+            slug: "auriculares",
+            featured: true,
+          },
+        ],
+      }) as never,
+    );
+
+    const products = await getCategoryProducts("1");
+
+    expect(get).toHaveBeenCalledWith("/api/products", {
+      params: { size: 100, categoryId: "1" },
+    });
+    expect(products[0]).toMatchObject({
+      id: "10",
+      categoryName: "Tecnología",
+      subcategory: "Audio",
+    });
   });
 
   it("maps category DTO fields into the screen type", async () => {

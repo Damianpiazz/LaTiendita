@@ -126,6 +126,7 @@ services:
       - ./authorizer/seed:/seed:ro
     environment:
       AUTHORIZER_URL: http://authorizer:8080
+      AUTHORIZER_ADMIN_SECRET: ${AUTHORIZER_ADMIN_SECRET:?Falta AUTHORIZER_ADMIN_SECRET en .env}
       SEED_ORIGIN: ${SEED_ORIGIN:-http://localhost:3000}
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-Password123!}
     depends_on:

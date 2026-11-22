@@ -23,6 +23,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, "Categoría no encontrada", ex.getMessage());
     }
 
+    @ExceptionHandler(CategoryHasProductsException.class)
+    public ProblemDetail onCategoryHasProducts(CategoryHasProductsException ex) {
+        return problem(HttpStatus.CONFLICT, "Categoría en uso", ex.getMessage());
+    }
+
     @ExceptionHandler(DuplicateSkuException.class)
     public ProblemDetail onDuplicateSku(DuplicateSkuException ex) {
         return problem(HttpStatus.CONFLICT, "Recurso duplicado", ex.getMessage());

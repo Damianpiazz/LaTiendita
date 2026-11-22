@@ -44,7 +44,7 @@ export async function login(email: string, password: string): Promise<SessionUse
     if (data.mfaRequired) {
       const { data: skipped } = await httpClient.post<AuthResponse>(
         "/api/auth/skip-mfa",
-        { email: data.email ?? email },
+        { email: data.email ?? email, password },
         { baseURL: "" },
       );
 
@@ -77,7 +77,7 @@ export async function signup({ name, email, password }: SignupInput): Promise<Se
     if (data.mfaRequired) {
       const { data: skipped } = await httpClient.post<AuthResponse>(
         "/api/auth/skip-mfa",
-        { email: data.email ?? email },
+        { email: data.email ?? email, password },
         { baseURL: "" },
       );
 

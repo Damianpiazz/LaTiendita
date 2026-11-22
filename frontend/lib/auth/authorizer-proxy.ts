@@ -67,3 +67,55 @@ export function isMfaOffer(payload: unknown): boolean {
     String(record.message ?? "").toLowerCase().includes("mfa")
   );
 }
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
+    const parsed = JSON.parse(payload);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readRoles(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((role): role is string => typeof role === "string" && role.trim().length > 0)
+    : [];
+}
+
+/**
+ * Authorizer grants default instance roles on plain login. If the user can hold
+ * higher roles (e.g. admin), re-login requesting all allowed roles so the JWT
+ * carries the permissions the gateway enforces.
+ */
+export function rolesToElevate(payload: unknown): string[] | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const token = (payload as Record<string, unknown>).access_token;
+  if (typeof token !== "string" || !token.trim()) {
+    return null;
+  }
+
+  const claims = decodeJwtPayload(token);
+  if (!claims) {
+    return null;
+  }
+
+  const roles = readRoles(claims.roles);
+  const allowedRoles = readRoles(claims.allowed_roles);
+  if (allowedRoles.length === 0) {
+    return null;
+  }
+
+  const granted = new Set(roles);
+  const missing = allowedRoles.filter((role) => !granted.has(role));
+  return missing.length > 0 ? allowedRoles : null;
+}

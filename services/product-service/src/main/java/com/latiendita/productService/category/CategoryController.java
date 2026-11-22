@@ -46,12 +46,13 @@ public class CategoryController {
         return categoryService.update(categoryId, dto);
     }
 
-    /** GET /api/categories?featured=true&page=&size=&sort= — sin filtro, comportamiento previo. */
+    /** GET /api/categories?q=&featured=&page=&size=&sort= — sin filtros, comportamiento previo. */
     @GetMapping
     public Page<CategoryDto> findAll(
+            @RequestParam(required = false) String q,
             @RequestParam(required = false) Boolean featured,
             Pageable pageable) {
-        return categoryService.findAll(featured, pageable);
+        return categoryService.findAll(q, featured, pageable);
     }
 
     @GetMapping("/paging")

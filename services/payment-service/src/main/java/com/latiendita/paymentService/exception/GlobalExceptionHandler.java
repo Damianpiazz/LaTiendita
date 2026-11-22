@@ -27,6 +27,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "Acceso denegado", ex.getMessage());
     }
 
+    @ExceptionHandler(AdminRoleRequiredException.class)
+    public ProblemDetail onAdminRequired(AdminRoleRequiredException ex) {
+        return problem(HttpStatus.FORBIDDEN, "Acceso denegado", ex.getMessage());
+    }
+
     @ExceptionHandler(InvalidPaymentException.class)
     public ProblemDetail onInvalidPayment(InvalidPaymentException ex) {
         return problem(HttpStatus.BAD_REQUEST, "Pago inválido", ex.getMessage());
