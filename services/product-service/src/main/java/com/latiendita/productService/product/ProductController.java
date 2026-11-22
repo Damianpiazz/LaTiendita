@@ -1,11 +1,18 @@
 package com.latiendita.productService.product;
 
+import com.latiendita.productService.product.dto.AdminLowStockResponse;
+import com.latiendita.productService.product.dto.AdminProductResponse;
+import com.latiendita.productService.product.dto.AdminProductSummaryResponse;
 import com.latiendita.productService.product.dto.ProductDto;
+import com.latiendita.productService.product.dto.ProductIdsRequest;
+import com.latiendita.productService.product.dto.ProductStatusUpdateRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,6 +67,60 @@ public class ProductController {
             @RequestParam(required = false) Boolean featured,
             Pageable pageable) {
         return productService.search(q, categoryId, featured, pageable);
+    }
+
+    @GetMapping("/admin/low-stock")
+    public AdminLowStockResponse lowStock(
+            @RequestParam(defaultValue = "5") int threshold,
+            @RequestParam(defaultValue = "5") int size) {
+        return productService.adminLowStock(threshold, size);
+    }
+
+    /** GET /api/products/admin/summary?q=&categoryId= */
+    @GetMapping("/admin/summary")
+    public AdminProductSummaryResponse adminSummary(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long categoryId) {
+        return productService.adminSummary(q, categoryId);
+    }
+
+    /** GET /api/products/admin?q=&status=&categoryId=&page=&size=&sort= */
+    @GetMapping("/admin")
+    public Page<AdminProductResponse> adminProducts(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long categoryId,
+            Pageable pageable) {
+        return productService.adminProducts(q, status, categoryId, pageable);
+    }
+
+    /** POST /api/products/admin/status — publica o archiva varios productos a la vez. */
+    @PostMapping("/admin/status")
+    public ResponseEntity<Void> updateStatus(
+            @Valid @RequestBody ProductStatusUpdateRequest request) {
+        productService.updatePublishedStatus(request.productIds(), request.published());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** DELETE /api/products/admin — borrado masivo con el ID en el body. */
+    @DeleteMapping("/admin")
+    public ResponseEntity<Void> deleteProducts(@Valid @RequestBody ProductIdsRequest request) {
+        productService.deleteProducts(request.productIds());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** GET /api/products/admin/export.csv?q=&status=&categoryId=&sort= */
+    @GetMapping("/admin/export.csv")
+    public ResponseEntity<String> exportCsv(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long categoryId,
+            Pageable pageable) {
+        String csv = productService.exportAdminCsv(q, status, categoryId, pageable.getSort());
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header("Content-Disposition", "attachment; filename=\"productos-admin.csv\"")
+                .body(csv);
     }
 
     /** Acepta tanto el ID numérico histórico como el slug del catálogo. */

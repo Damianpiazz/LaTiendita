@@ -1,5 +1,6 @@
 package com.latiendita.productService.product.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
@@ -33,7 +34,9 @@ public record ProductDto(
         @Size(max = 10) List<@Size(max = 500) String> images,
         @Size(max = 20) List<@Size(max = 2000) String> description,
         @Size(max = 20) List<@Size(max = 500) String> highlights,
-        @Size(max = 30) @Valid List<ProductSpec> specs
+        @Size(max = 30) @Valid List<ProductSpec> specs,
+        /** Admin publish flag; input only so the public catalog payload stays unchanged. */
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) Boolean published
 ) {
 
     /** Backward-compatible constructor for existing internal callers. */
@@ -41,7 +44,14 @@ public record ProductDto(
                       BigDecimal price, Integer quantity, Long categoryId) {
         this(productId, title, imageUrl, sku, price, quantity, categoryId,
                 null, null, null, false, null, null,
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), null);
+    }
+
+    /** Returns a copy carrying the requested publish flag. */
+    public ProductDto withPublished(Boolean published) {
+        return new ProductDto(productId, title, imageUrl, sku, price, quantity, categoryId,
+                slug, categoryName, subcategory, featured, originalPrice, fulfillment,
+                images, description, highlights, specs, published);
     }
 
     /** Stable id alias consumed by the catalog screens. */

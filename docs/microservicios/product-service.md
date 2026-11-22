@@ -23,6 +23,12 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://productServic
 | `PUT` | `/api/products` | Actualiza un producto (el ID viene en el body) | `ProductDto` | `200` ProductDto | Sí (admin, vía gateway) |
 | `PUT` | `/api/products/{productId}` | Actualiza un producto (el ID de la ruta tiene prioridad) | `ProductDto` | `200` ProductDto | Sí (admin, vía gateway) |
 | `DELETE` | `/api/products/{productId}` | Elimina un producto (borrado físico) | — | `204` | Sí (admin, vía gateway) |
+| `GET` | `/api/products/admin/low-stock` | Productos con stock bajo para el KPI del Admin Resumen (`threshold`, `size`) | — | `200` `AdminLowStockResponse` | No |
+| `GET` | `/api/products/admin/summary` | Totales del subtítulo de Admin Productos; `q` y `categoryId` filtran `totalProducts` y `totalLowStock`, `totalCategories` es global | — | `200` `AdminProductSummaryResponse` | No |
+| `GET` | `/api/products/admin` | Listado paginado del ABM con `q` (título o SKU), `status` (`publicado`/`borrador`/`agotado`), `categoryId`, `page`, `size` y `sort` | — | `200` Page\<AdminProductResponse\> | No |
+| `POST` | `/api/products/admin/status` | Publica o archiva productos en lote (`productIds` no vacío, `published` booleano) | `ProductStatusUpdateRequest` | `204` | Sí (admin, vía gateway) |
+| `DELETE` | `/api/products/admin` | Elimina productos en lote con los IDs en el body (`productIds` no vacío) | `ProductIdsRequest` | `204` | Sí (admin, vía gateway) |
+| `GET` | `/api/products/admin/export.csv` | Exporta el mismo filtrado/orden del listado como CSV (`text/csv`, cabecera + filas citadas según RFC 4180) | — | `200` CSV | No |
 | `GET` | `/api/categories` | Listado paginado de categorías (`Pageable`, con `sort` validado) y filtro opcional `featured` para la Home | — | `200` Page\<CategoryDto\> | No |
 | `GET` | `/api/categories/paging` | Listado paginado con `page` (default `0`) y `size` (default `10`) | — | `200` Page\<CategoryDto\> | No |
 | `GET` | `/api/categories/paging-and-sorting` | Listado paginado y ordenado con `pageNo` (default `0`), `pageSize` (default `10`) y `sortBy` (default `categoryId`) | — | `200` Page\<CategoryDto\> | No |
@@ -32,16 +38,19 @@ Todas las rutas son relativas a la raíz del servicio (ej. `http://productServic
 | `PUT` | `/api/categories/{categoryId}` | Actualiza una categoría (el ID de la ruta tiene prioridad) | `CategoryDto` | `200` CategoryDto | Sí (admin, vía gateway) |
 | `DELETE` | `/api/categories/{categoryId}` | Elimina una categoría (borrado físico) | — | `204` | Sí (admin, vía gateway) |
 
-**Comportamiento de `sort`:** formato `propiedad` o `propiedad,asc|desc`. Propiedades permitidas en productos: `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`, `slug`, `subcategory`, `featured`, `originalPrice`, `fulfillment`; en categorías: `id`, `name`, `description`, `featured`. Cualquier otra (incluidos `-id` o `campo:1`) responde `400` vía `SortValidator` **antes** de llegar a JPA.
+**Comportamiento de `sort`:** formato `propiedad` o `propiedad,asc|desc`. Propiedades permitidas en productos: `id`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`, `slug`, `subcategory`, `featured`, `published`, `originalPrice`, `fulfillment`; en categorías: `id`, `name`, `description`, `featured`. Cualquier otra (incluidos `-id` o `campo:1`) responde `400` vía `SortValidator` **antes** de llegar a JPA.
 
-**Filtros combinables de `GET /api/products`:** `q` + `categoryId` + `featured`, y cualquier subconjunto (incluido ninguno). Se resuelven con una única query JPQL con parámetros anulables, sin inferencia de tipos ante `null`.
+**Filtros combinables de `GET /api/products`:** `q` + `categoryId` + `featured`, y cualquier subconjunto (incluido ninguno). Se resuelven con una única query JPQL con parámetros anulables, sin inferencia de tipos ante `null`. Sin filtros, el contrato de respuesta es idéntico al histórico: `published` se acepta sólo en el body de `POST`/`PUT` y no se serializa en el catálogo.
+
+**Filtros de las rutas admin:** `q` busca por título **o SKU**; `status` se calcula en JPQL a partir de `quantity` y `published`. Un valor de `status` fuera de `publicado`/`borrador`/`agotado` se ignora (sin filtro). `/api/products/admin/export.csv` y `/api/products/admin` comparten las mismas condiciones; los parámetros `page`/`size` del CSV se ignoran y se exportan todas las filas coincidentes.
 
 ### 2.1 Endpoints pendientes
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
 | `POST` | `/api/products/{productId}/images` | Subida de imágenes desde el ABM de administración (hoy la galería se envía como JSON en `POST`/`PUT /api/products`) | `<a implementar>` |
-| `GET` | `/api/admin/products?quantityBelow=5` | Productos con stock bajo (KPI "Stock bajo" del Admin Resumen) | `<a implementar>` |
+
+> El KPI "Stock bajo" del Admin Resumen ya está cubierto por `GET /api/products/admin/low-stock` (detalle) y por `totalLowStock` de `GET /api/products/admin/summary` (aggregate).
 
 ---
 
@@ -94,6 +103,7 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | `slug` | `varchar(255)` | ❌ | ❌ | ✅ | Identificador amigable para rutas del catálogo; se genera desde `title` (normalizando acentos) si no se envía |
 | `subcategory` | `varchar(100)` | ❌ | ❌ | ❌ | Agrupación dentro de la categoría (ej. `Audio` bajo `Tecnología`) |
 | `featured` | `boolean` | ❌ | ❌ | ❌ | Marca el producto para la grilla "Featured" del Home (default `false`) |
+| `published` | `boolean` | ❌ | ❌ | ❌ | Estado de publicación del ABM (`true` = publicado), independiente de `featured`. Default `true` en Java (`@Builder.Default`) y en DDL (`@ColumnDefault("true")`); con `ddl-auto=update` la columna nueva se agrega con ese default y las filas existentes quedan publicadas |
 | `original_price` | `numeric(12,2)` | ❌ | ❌ | ❌ | Precio anterior tachado en la tarjeta/detalle, `>= 0`, hasta 2 decimales |
 | `fulfillment` | `varchar(100)` | ❌ | ❌ | ❌ | Texto de disponibilidad/envío (ej. `24/48 hs`) |
 | `images_json` | `text` | ❌ | ❌ | ❌ | Galería de imágenes como array JSON de strings (`JsonListConverter`); `image_url` sigue siendo la imagen principal/proxy |
@@ -128,6 +138,8 @@ Formato de respuesta de error: **ProblemDetail (RFC 7807)**, emitido por `Global
 | Borrado | Físico (`delete`) en ambos modelos; no hay borrado lógico ni protección de referencias hacia productos al borrar una categoría |
 | Concurrencia | Ambas entidades usan `@Version`: actualizaciones concurrentes devuelven `409` |
 | Ordenamiento | `sort` validado contra allowlist (`SortValidator`) antes de tocar JPA |
+| Estado del ABM | `status` NO se persiste: `agotado` si `quantity <= 0` (o nulo), si no `publicado` con `published=true` y `borrador` con `published=false`. Se deriva en `AdminProductMapper.status` y se filtra en JPQL; `featured` pertenece al Home y no interviene |
+| Publicación por defecto | `POST`/`PUT /api/products` aceptan `published` (booleano, `null`/ausente ⇒ `true`). El campo es de sólo escritura en `ProductDto`, por lo que el payload de `GET /api/products` no cambia |
 | Imágenes | `image_url` guarda la CLAVE del blob (no la URL absoluta), de modo que el storage pueda cambiarse sin migrar el dato; el `GET .../image` resuelve clave → bytes. La galería se gestiona como JSON desde la API (§4.4); no hay seeders |
 
 ### 4.4 DTOs (contratos de API)
@@ -136,7 +148,11 @@ Campos derivados de las entidades de §4.1 y de lo que consumen las pantallas de
 
 | DTO | Uso | Campos | Origen / nota |
 |---|---|---|---|
-| `ProductDto` | `GET /api/products`, `GET /api/products/{productIdOrSlug}`, body de `POST`/`PUT /api/products` | Históricos: `productId`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`. Alias derivados: `id` (= `productId` como string), `name` (= `title`), `stock` (= `quantity`), `galleryCount`. Catálogo/detalle: `slug`, `categoryName`, `subcategory`, `featured`, `originalPrice`, `fulfillment`, `images`, `description`, `highlights`, `specs` (`[{label,value}]`) | La entidad conserva los campos históricos; el mapper agrega los alias y el `categoryName` (resuelto con `findAllById` para evitar N+1). Si `images` viene vacío, usa `imageUrl` como única imagen. **No incluye** `installmentCount`, `rating`, `reviewCount` ni `soldCount`: cuotas y valoraciones quedan fuera de este servicio |
+| `ProductDto` | `GET /api/products`, `GET /api/products/{productIdOrSlug}`, body de `POST`/`PUT /api/products` | Históricos: `productId`, `title`, `imageUrl`, `sku`, `price`, `quantity`, `categoryId`. Alias derivados: `id` (= `productId` como string), `name` (= `title`), `stock` (= `quantity`), `galleryCount`. Catálogo/detalle: `slug`, `categoryName`, `subcategory`, `featured`, `originalPrice`, `fulfillment`, `images`, `description`, `highlights`, `specs` (`[{label,value}]`) | La entidad conserva los campos históricos; el mapper agrega los alias y el `categoryName` (resuelto con `findAllById` para evitar N+1). Si `images` viene vacío, usa `imageUrl` como única imagen. `published` es de **sólo entrada** (`@JsonProperty(WRITE_ONLY)`): lo envían `POST`/`PUT` para el toggle del ABM y no aparece en la respuesta del catálogo. **No incluye** `installmentCount`, `rating`, `reviewCount` ni `soldCount`: cuotas y valoraciones quedan fuera de este servicio |
+| `AdminProductResponse` | Item de `GET /api/products/admin` y filas del CSV | `productId` (string), `name`, `sku`, `category`, `price`, `stock`, `status` (`publicado`/`borrador`/`agotado`), `published` | `status` se deriva en `AdminProductMapper` con la regla de §4.3; `category` es el nombre resuelto en lote (`findAllById`) |
+| `AdminProductSummaryResponse` | `GET /api/products/admin/summary` | `totalProducts`, `totalCategories`, `totalLowStock`, `lowStockThreshold` | `lowStockThreshold` es `5`; `totalLowStock` cuenta `quantity < 5` |
+| `ProductStatusUpdateRequest` | Body de `POST /api/products/admin/status` | `productIds` (`@NotEmpty`), `published` (`@NotNull`) | Los IDs inexistentes se ignoran; la operación es idempotente |
+| `ProductIdsRequest` | Body de `DELETE /api/products/admin` | `productIds` (`@NotEmpty`) | Borrado físico; los IDs inexistentes se ignoran |
 | `CategoryDto` | `GET /api/categories[/{idOrSlug}]`, body de `POST`/`PUT /api/categories` | `categoryId` (string en JSON), `name`, `description`, `slug`, `featured`, `productCount` | `slug` se deriva del `name` con la misma normalización que el catálogo; `productCount` se calcula con `countByCategoryId`; `featured` es el flag persistido. El constructor de 3 argumentos sigue disponible para clientes internos |
 
 > Nota de compatibilidad: el constructor de 7 argumentos de `ProductDto` (`productId, title, imageUrl, sku, price, quantity, categoryId`) se conserva para los clientes internos que aún lo usan; los campos nuevos defaultan a vacío/`false` en ese constructor. Clientes como `order-service` y `cart-service` deserializan los campos históricos sin cambios.
@@ -223,8 +239,10 @@ Pantalla del wireframe (`docs/OpenPencil/LaTiendita.fig`, página "WireFrame") �
 | **Product Detail — pestañas de detalles/especificaciones** | `GET /api/products/{productIdOrSlug}` expone `description` (array de párrafos), `highlights` y `specs` (`[{label,value}]`), todos persistidos como JSON | ✅ Implementado |
 | **Product Detail — sección de reseñas** | Fuera de alcance: la maneja `review-service` | ➖ Otro servicio |
 | **Product Detail — sección "Related"** (productos de la misma categoría) | `GET /api/products?categoryId={misma}&page=&size=` (misma query del listado de categoría) | ✅ Implementado |
-| **Admin Productos** — ABM (`+ Nuevo producto`, editar, eliminar) | `POST /api/products`, `PUT /api/products[/{id}]`, `DELETE /api/products/{id}`, `GET /api/products/{id}` | ✅ Implementado |
+| **Admin Productos** — ABM (`+ Nuevo producto`, editar, eliminar) | `POST /api/products`, `PUT /api/products[/{id}]`, `DELETE /api/products/{id}` y el borrado masivo `DELETE /api/products/admin`; `GET /api/products/admin` alimenta la tabla | ✅ Implementado |
 | **Admin Productos** — campos: nombre, precio, stock, categoría, SKU | `title`, `price`, `quantity`, `categoryId` (valida existencia), `sku` (único) | ✅ Implementado |
-| **Admin Productos** — campos: descripción, imágenes (subida), estado | `description`, `highlights`, `images`, `specs` y `featured` ya se envían en el `ProductDto` de `POST`/`PUT`; la **subida** de archivos sigue pendiente (la galería se envía como JSON de URLs/claves) | ⚠️ Campos implementados; subida: `<a implementar>` |
+| **Admin Productos** — búsqueda, pills de estado, categoría, orden, paginación y exportar CSV | `GET /api/products/admin?q=&status=&categoryId=&page=&size=&sort=` y `GET /api/products/admin/export.csv` con el mismo filtrado; `GET /api/products/admin/summary` para el subtítulo | ✅ Implementado |
+| **Admin Productos** — publicar/archivar en lote | `POST /api/products/admin/status` con `{ productIds, published }` → `204` | ✅ Implementado |
+| **Admin Productos** — campos: descripción, imágenes (subida), estado | `description`, `highlights`, `images`, `specs` y `published` se envían en el `ProductDto` de `POST`/`PUT`; `featured` sigue siendo del Home. La **subida** de archivos sigue pendiente (la galería se envía como JSON de URLs/claves) | ⚠️ Campos implementados; subida: `<a implementar>` |
 | **Admin Categorías** — ABM de categorías | `POST /api/categories`, `PUT /api/categories[/{id}]`, `DELETE /api/categories/{id}`, `GET /api/categories[/{id}]`; campos `name` + `description` + `featured` | ✅ Implementado |
-| **Admin Resumen** — KPI "Stock bajo" (productos con menos de 5 unidades) | Los datos crudos existen (`GET /api/products` con filtro de cantidad), pero no hay endpoint de agregación ni filtro `quantityBelow` | ⚠️ `<a implementar>` |
+| **Admin Resumen** — KPI "Stock bajo" (productos con menos de 5 unidades) | `GET /api/products/admin/low-stock?threshold=5&size=5` para el detalle y `totalLowStock` de `GET /api/products/admin/summary` para el total | ✅ Implementado |

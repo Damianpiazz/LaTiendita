@@ -204,6 +204,7 @@ class ProductCatalogModelTest {
                 List.of("main.png", "side.png"),
                 List.of("Un párrafo"),
                 List.of("Cancelación activa"),
-                List.of(new ProductSpec("Marca", "SoundCore")));
+                List.of(new ProductSpec("Marca", "SoundCore")),
+                null);
     }
 }

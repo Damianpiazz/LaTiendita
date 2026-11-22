@@ -6,10 +6,17 @@ import com.latiendita.productService.exception.CategoryNotFoundException;
 import com.latiendita.productService.exception.DuplicateSkuException;
 import com.latiendita.productService.exception.DuplicateSlugException;
 import com.latiendita.productService.exception.ProductNotFoundException;
+import com.latiendita.productService.product.dto.AdminLowStockProductResponse;
+import com.latiendita.productService.product.dto.AdminLowStockResponse;
+import com.latiendita.productService.product.dto.AdminProductCsvWriter;
+import com.latiendita.productService.product.dto.AdminProductMapper;
+import com.latiendita.productService.product.dto.AdminProductResponse;
+import com.latiendita.productService.product.dto.AdminProductSummaryResponse;
 import com.latiendita.productService.product.dto.ProductDto;
 import com.latiendita.productService.product.dto.ProductMapper;
 import com.latiendita.productService.sort.SortValidator;
 import java.text.Normalizer;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -21,6 +28,7 @@ import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,13 +37,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class ProductService {
 
+    public static final int LOW_STOCK_THRESHOLD = 5;
+
     /**
      * Propiedades de {@link ProductEntity} que se pueden usar en `sort`. Cualquier
      * otra (o un formato como `-id`) se rechaza con 400 antes de llegar a JPA.
      */
     private static final Set<String> SORTABLE_PROPERTIES = Set.of(
             "id", "title", "imageUrl", "sku", "price", "quantity", "categoryId", "slug",
-            "subcategory", "featured", "originalPrice", "fulfillment");
+            "subcategory", "featured", "published", "originalPrice", "fulfillment");
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -61,6 +71,7 @@ public class ProductService {
                 .slug(slug)
                 .subcategory(dto.subcategory())
                 .featured(dto.featured())
+                .published(resolvePublished(dto.published()))
                 .originalPrice(dto.originalPrice())
                 .fulfillment(dto.fulfillment())
                 .images(orEmpty(dto.images()))
@@ -96,6 +107,7 @@ public class ProductService {
         product.setSlug(slug);
         product.setSubcategory(dto.subcategory());
         product.setFeatured(dto.featured());
+        product.setPublished(resolvePublished(dto.published()));
         product.setOriginalPrice(dto.originalPrice());
         product.setFulfillment(dto.fulfillment());
         product.setImages(orEmpty(dto.images()));
@@ -126,8 +138,73 @@ public class ProductService {
     public Page<ProductDto> search(String q, Long categoryId, Boolean featured,
                                    Pageable pageable) {
         SortValidator.validate(pageable.getSort(), SORTABLE_PROPERTIES);
-        String term = q == null || q.isBlank() ? null : q.trim();
-        return toDtos(productRepository.search(term, categoryId, featured, pageable));
+        return toDtos(productRepository.search(normalize(q), categoryId, featured, pageable));
+    }
+
+    @Transactional(readOnly = true)
+    public AdminLowStockResponse adminLowStock(int threshold, int size) {
+        int safeThreshold = Math.max(threshold, 0);
+        int safeSize = Math.max(size, 1);
+        Page<ProductEntity> page = productRepository.findByQuantityLessThanOrderByQuantityAsc(
+                safeThreshold, org.springframework.data.domain.PageRequest.of(0, safeSize));
+        long total = productRepository.countByQuantityLessThan(safeThreshold);
+        List<AdminLowStockProductResponse> items = page.getContent().stream()
+                .map(product -> new AdminLowStockProductResponse(
+                        product.getTitle(), product.getSku(), product.getQuantity()))
+                .toList();
+        return new AdminLowStockResponse(items, total, safeThreshold);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminProductResponse> adminProducts(String q, String status, Long categoryId,
+                                                    Pageable pageable) {
+        SortValidator.validate(pageable.getSort(), SORTABLE_PROPERTIES);
+        Page<ProductEntity> page = productRepository.searchAdmin(
+                normalize(q), normalizeStatus(status), categoryId, pageable);
+        Map<Long, String> names = categoryNames(page.getContent());
+        return page.map(entity -> AdminProductMapper.toDto(
+                entity, names.get(entity.getCategoryId())));
+    }
+
+    @Transactional(readOnly = true)
+    public AdminProductSummaryResponse adminSummary(String q, Long categoryId) {
+        String term = normalize(q);
+        return new AdminProductSummaryResponse(
+                productRepository.countAdmin(term, categoryId),
+                categoryRepository.count(),
+                productRepository.countAdminLowStock(term, categoryId, LOW_STOCK_THRESHOLD),
+                LOW_STOCK_THRESHOLD);
+    }
+
+    @Transactional
+    public void updatePublishedStatus(List<Long> productIds, boolean published) {
+        if (productIds == null || productIds.isEmpty()) {
+            return;
+        }
+        List<ProductEntity> products = productRepository.findAllById(productIds);
+        products.forEach(product -> product.setPublished(published));
+        productRepository.saveAll(products);
+    }
+
+    @Transactional
+    public void deleteProducts(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return;
+        }
+        productRepository.deleteAllById(productIds);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportAdminCsv(String q, String status, Long categoryId, Sort sort) {
+        SortValidator.validate(sort, SORTABLE_PROPERTIES);
+        List<ProductEntity> products = productRepository.searchAdminList(
+                normalize(q), normalizeStatus(status), categoryId, sort);
+        Map<Long, String> names = categoryNames(products);
+        List<AdminProductResponse> rows = products.stream()
+                .map(entity -> AdminProductMapper.toDto(
+                        entity, names.get(entity.getCategoryId())))
+                .toList();
+        return AdminProductCsvWriter.toCsv(rows);
     }
 
     @Transactional(readOnly = true)
@@ -170,20 +247,41 @@ public class ProductService {
     }
 
     private Page<ProductDto> toDtos(Page<ProductEntity> page) {
-        Set<Long> categoryIds = page.getContent().stream()
+        Map<Long, String> names = categoryNames(page.getContent());
+        return page.map(entity -> ProductMapper.toDto(entity, names.get(entity.getCategoryId())));
+    }
+
+    private Map<Long, String> categoryNames(Collection<ProductEntity> products) {
+        Set<Long> categoryIds = products.stream()
                 .map(ProductEntity::getCategoryId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-
-        Map<Long, String> categoryNames = new HashMap<>();
-        if (!categoryIds.isEmpty()) {
-            categoryNames = StreamSupport.stream(
-                            categoryRepository.findAllById(categoryIds).spliterator(), false)
-                    .collect(Collectors.toMap(CategoryEntity::getId, CategoryEntity::getName));
+        if (categoryIds.isEmpty()) {
+            return new HashMap<>();
         }
+        return StreamSupport.stream(
+                        categoryRepository.findAllById(categoryIds).spliterator(), false)
+                .collect(Collectors.toMap(CategoryEntity::getId, CategoryEntity::getName));
+    }
 
-        final Map<Long, String> names = categoryNames;
-        return page.map(entity -> ProductMapper.toDto(entity, names.get(entity.getCategoryId())));
+    private static String normalize(String q) {
+        return q == null || q.isBlank() ? null : q.trim();
+    }
+
+    /** Unknown status values are ignored so the pill filter stays forgiving. */
+    private static String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String value = status.trim().toLowerCase(Locale.ROOT);
+        return Set.of(AdminProductMapper.STATUS_PUBLICADO,
+                AdminProductMapper.STATUS_BORRADOR,
+                AdminProductMapper.STATUS_AGOTADO).contains(value) ? value : null;
+    }
+
+    /** Omitting the flag in create/edit keeps the historical published-by-default behavior. */
+    private static boolean resolvePublished(Boolean published) {
+        return published == null || published;
     }
 
     private CategoryEntity validateCategory(Long categoryId) {

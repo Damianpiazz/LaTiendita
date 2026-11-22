@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AllArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -76,6 +77,16 @@ public class ProductEntity {
     @Builder.Default
     @Column(name = "featured")
     private Boolean featured = false;
+
+    /**
+     * Admin publish flag, independent from the Home-only `featured` flag. The
+     * column default backfills existing rows when ddl-auto=update adds it; the
+     * Java default covers newly constructed entities.
+     */
+    @Builder.Default
+    @ColumnDefault("true")
+    @Column(name = "published", nullable = false)
+    private Boolean published = true;
 
     @PositiveOrZero
     @Digits(integer = 10, fraction = 2)

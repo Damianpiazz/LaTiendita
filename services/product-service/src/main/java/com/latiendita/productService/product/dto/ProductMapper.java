@@ -33,7 +33,8 @@ public final class ProductMapper {
                 images == null ? List.of() : images,
                 entity.getDescription() == null ? List.of() : entity.getDescription(),
                 entity.getHighlights() == null ? List.of() : entity.getHighlights(),
-                entity.getSpecs() == null ? List.of() : entity.getSpecs());
+                entity.getSpecs() == null ? List.of() : entity.getSpecs(),
+                entity.getPublished());
     }
 
     private static boolean hasText(String value) {
