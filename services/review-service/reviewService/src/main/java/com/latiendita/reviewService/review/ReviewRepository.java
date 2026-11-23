@@ -18,5 +18,8 @@ public interface ReviewRepository extends JpaRepository<ReviewEntity, UUID>,
 
     List<ReviewEntity> findAllByProductId(Long productId);
 
+    /** Reviews written by the signed-in customer, newest first. */
+    List<ReviewEntity> findAllByCustomerIdOrderByCreatedAtDesc(String customerId);
+
     void deleteAllByProductId(Long productId);
 }

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import { setCategoryFeatured } from "@/features/admin/actions/category-actions";
@@ -29,9 +31,42 @@ export function CategoryDetailCard({
         <h2 className="text-base font-bold text-wf-ink">
           Detalle de la categoría
         </h2>
-        <span aria-hidden className="font-bold text-wf-ink-placeholder">
-          ···
-        </span>
+        <details className="relative list-none [&::-webkit-details-marker]:hidden">
+          <summary
+            aria-label={`Acciones de ${category.name}`}
+            className="cursor-pointer font-bold text-wf-ink-placeholder hover:text-wf-ink"
+          >
+            ···
+          </summary>
+          <div
+            role="menu"
+            className="absolute right-0 top-7 z-20 flex w-44 flex-col rounded-wf-sm border border-wf-line bg-wf-surface p-1 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onEdit}
+              className="rounded-wf-sm px-3 py-2 text-left text-sm text-wf-ink-secondary hover:bg-wf-canvas hover:text-wf-ink"
+            >
+              Editar
+            </button>
+            <Link
+              href={`/categorias/${category.slug}`}
+              role="menuitem"
+              className="rounded-wf-sm px-3 py-2 text-sm text-wf-ink-secondary hover:bg-wf-canvas hover:text-wf-ink"
+            >
+              Ver en tienda ↗
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onDelete}
+              className="rounded-wf-sm px-3 py-2 text-left text-sm text-red-600 hover:bg-wf-canvas"
+            >
+              Eliminar
+            </button>
+          </div>
+        </details>
       </div>
 
       {imageUrl ? (

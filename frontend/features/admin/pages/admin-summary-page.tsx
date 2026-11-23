@@ -28,10 +28,10 @@ export async function AdminSummaryPage() {
 
         <div className="flex flex-col gap-6 xl:w-[352px] xl:shrink-0">
           <LowStockCard
-            products={summary.lowStock}
+            products={summary.lowStockProducts}
             threshold={summary.lowStockThreshold}
           />
-          <ActivityCard entries={summary.activity} />
+          <ActivityCard entries={summary.recentActivity} />
         </div>
       </div>
     </div>

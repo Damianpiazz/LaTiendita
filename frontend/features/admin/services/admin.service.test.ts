@@ -437,7 +437,15 @@ describe("admin.service", () => {
     expect(ADMIN_ORDERS_PAGE_SIZE).toBe(8);
     expect(ADMIN_ORDERS_DEFAULT_SORT).toBe("createdAt,desc");
     expect(get).toHaveBeenCalledWith("/api/orders/admin", {
-      params: { page: 1, size: 8, sort: "createdAt,desc", q: "1042", status: "PENDING" },
+      params: expect.objectContaining({
+        page: 1,
+        size: 8,
+        sort: "createdAt,desc",
+        q: "1042",
+        status: "PENDING",
+        from: expect.any(String),
+        to: expect.any(String),
+      }),
       headers: { Authorization: "Bearer test-token" },
     });
     expect(get).toHaveBeenCalledWith("/api/orders/admin/stats", {
@@ -453,6 +461,64 @@ describe("admin.service", () => {
       payment: "mercado-pago",
       status: "pendiente",
       itemCount: 3,
+    });
+  });
+
+  it("resolves the customer identity for order rows from the admin endpoint", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/orders/admin") {
+        return response({
+          content: [
+            {
+              id: 1042,
+              orderNumber: "ORD-1042",
+              customerId: "customer-9",
+              paymentMethod: null,
+              status: "PENDING",
+              total: 45998,
+              itemCount: 3,
+              createdAt: "2026-11-10T12:42:00Z",
+            },
+          ],
+        }) as never;
+      }
+      if (url === "/api/orders/admin/stats") {
+        return response({
+          totalOrders: 1,
+          pendingDispatch: 1,
+          cancelledInPeriod: 0,
+          statusCounts: {
+            todos: 1,
+            pendiente: 1,
+            pagado: 0,
+            enviado: 0,
+            entregado: 0,
+            cancelado: 0,
+          },
+        }) as never;
+      }
+      if (url === "/api/payments/order/1042") {
+        return response({ provider: "MERCADO_PAGO" }) as never;
+      }
+      if (url === "/api/customers/customer-9") {
+        return response({
+          customerId: "customer-9",
+          firstName: "Lucía",
+          lastName: "Gómez",
+          email: "lucia@mail.com",
+        }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const result = await getAdminOrders();
+
+    expect(get).toHaveBeenCalledWith("/api/customers/customer-9", {
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(result.items[0]).toMatchObject({
+      customer: "Lucía Gómez",
+      email: "lucia@mail.com",
     });
   });
 
@@ -543,6 +609,62 @@ describe("admin.service", () => {
       approvalRate: 91,
       approvalAttempts: 37,
       rangeLabel: "Últimos 30 días",
+    });
+  });
+
+  it("resolves the customer identity for payment rows from the admin endpoint", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/api/payments/admin") {
+        return response({
+          content: [
+            {
+              id: 812,
+              orderNumber: "ORD-1042",
+              customerId: "user-1",
+              provider: "MERCADO_PAGO",
+              paymentType: "credit_card",
+              paidAt: "2026-11-10T12:42:00Z",
+              amount: 45998,
+              status: "PENDING",
+            },
+          ],
+        }) as never;
+      }
+      if (url === "/api/payments/admin/summary") {
+        return response({
+          paymentsToClear: 0,
+          paymentsInReview: 0,
+          totalPayments: 1,
+          approvedCount: 0,
+          pendingCount: 1,
+          rejectedCount: 0,
+          approvedVolume: 0,
+          pendingVolume: 0,
+          rejectedVolume: 0,
+          approvalRate: 0,
+          approvalAttempts: 0,
+          rangeDays: 30,
+        }) as never;
+      }
+      if (url === "/api/customers/user-1") {
+        return response({
+          customerId: "user-1",
+          firstName: "Ana",
+          lastName: "Pérez",
+          email: "ana@mail.com",
+        }) as never;
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const result = await getAdminPayments();
+
+    expect(get).toHaveBeenCalledWith("/api/customers/user-1", {
+      headers: { Authorization: "Bearer test-token" },
+    });
+    expect(result.items[0]).toMatchObject({
+      customer: "Ana Pérez",
+      email: "ana@mail.com",
     });
   });
 

@@ -47,7 +47,9 @@ public class DeliveryAddressEntity {
     @Column(name = "postal_code", nullable = false, length = 10)
     private String postalCode;
 
-    @Column(length = 200)
+    // "references" is a reserved word in PostgreSQL: ddl-auto cannot create the
+    // table with that column name. Keep the Java property, map it to a safe name.
+    @Column(name = "reference_notes", length = 200)
     private String references;
 
     @Column(name = "is_default", nullable = false)

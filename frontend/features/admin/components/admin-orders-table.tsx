@@ -1,7 +1,11 @@
 "use client";
 
 import { StatusBadge } from "@/features/admin/components/status-badge";
-import type { AdminOrders, AdminPaymentMethod } from "@/features/admin/types";
+import type {
+  AdminOrder,
+  AdminOrders,
+  AdminPaymentMethod,
+} from "@/features/admin/types";
 import { formatPrice } from "@/features/product/helpers/format-price";
 
 const paymentLabels: Record<AdminPaymentMethod, string> = {
@@ -11,16 +15,35 @@ const paymentLabels: Record<AdminPaymentMethod, string> = {
   "—": "—",
 };
 
+const SORT_OPTIONS = [
+  { value: "createdAt,desc", label: "Más recientes ↓" },
+  { value: "createdAt,asc", label: "Más antiguos ↑" },
+  { value: "total,desc", label: "Mayor total ↓" },
+  { value: "total,asc", label: "Menor total ↑" },
+];
+
 type Props = {
   orders: AdminOrders;
   q: string;
+  sort: string;
   loading: boolean;
   loadError: string | null;
   onSearchChange: (value: string) => void;
+  onSortChange: (value: string) => void;
+  onSelect: (order: AdminOrder) => void;
 };
 
-/** Orders card: header with search and sort, 40px head and 64px rows. */
-export function AdminOrdersTable({ orders, q, loading, loadError, onSearchChange }: Props) {
+/** Orders card: header with live search and sort, 40px head and 64px rows. */
+export function AdminOrdersTable({
+  orders,
+  q,
+  sort,
+  loading,
+  loadError,
+  onSearchChange,
+  onSortChange,
+  onSelect,
+}: Props) {
   return (
     <section className="overflow-hidden rounded-wf-md border border-wf-line bg-wf-surface">
       <div className="flex flex-wrap items-center justify-between gap-4 p-5">
@@ -50,9 +73,22 @@ export function AdminOrdersTable({ orders, q, loading, loadError, onSearchChange
               className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder disabled:opacity-60"
             />
           </div>
-          <span className="text-sm font-medium text-wf-ink-secondary">
-            Ordenar: Más recientes ↓
-          </span>
+          <label htmlFor="admin-orders-sort" className="text-sm font-medium text-wf-ink-secondary">
+            Ordenar:
+          </label>
+          <select
+            id="admin-orders-sort"
+            aria-label="Ordenar pedidos"
+            value={sort}
+            onChange={(event) => onSortChange(event.target.value)}
+            className="bg-transparent text-sm font-medium text-wf-ink-secondary outline-none"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -135,7 +171,14 @@ export function AdminOrdersTable({ orders, q, loading, loadError, onSearchChange
                 role="cell"
                 className="flex flex-1 justify-end font-medium text-wf-ink-secondary"
               >
-                Ver detalle →
+                <button
+                  type="button"
+                  onClick={() => onSelect(order)}
+                  aria-label={`Ver detalle del pedido ${order.id}`}
+                  className="underline-offset-2 hover:text-wf-ink hover:underline"
+                >
+                  Ver detalle →
+                </button>
               </div>
             </div>
           ))}

@@ -204,7 +204,6 @@ describe("getAdminClients real adapter", () => {
     });
     expect(detail).toEqual({
       ...row,
-      status: "activa",
       createdAt: "2026-10-20T10:00:00Z",
       lastLoginAt: "2026-11-10T09:00:00Z",
     });

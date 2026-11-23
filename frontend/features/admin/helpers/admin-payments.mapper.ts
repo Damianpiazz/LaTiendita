@@ -16,6 +16,8 @@ export type AdminPaymentApi = {
   status?: string | null;
   /** Optional only when the gateway exposes it; never synthesized. */
   email?: string | null;
+  /** Resolved by the admin BFF from the customer endpoint when absent. */
+  customerName?: string | null;
 };
 
 /** Wire shape of `GET /api/payments/admin/summary?days=30`. */
@@ -125,7 +127,7 @@ export function mapAdminPayment(dto: AdminPaymentApi): AdminPayment {
   return {
     id: `#${dto.id}`,
     orderId: orderLabel(dto.orderNumber),
-    customer: dto.customerId,
+    customer: dto.customerName?.trim() || dto.customerId,
     ...(dto.email ? { email: dto.email } : {}),
     provider: PROVIDER_LABELS[provider] ?? provider,
     method: methodLabel(dto),

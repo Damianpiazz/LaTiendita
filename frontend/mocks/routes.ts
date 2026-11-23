@@ -7,7 +7,12 @@ import {
   adminSummary,
 } from "./data/admin";
 import { categories } from "./data/categories";
-import { customerProfile } from "./data/customer";
+import {
+  customerApi,
+  customerOrdersApi,
+  customerProfile,
+  customerReviewsApi,
+} from "./data/customer";
 import { productDetails } from "./data/product-details";
 import { products } from "./data/products";
 import { getReviewSummaryMock, getReviewsMock } from "./data/reviews";
@@ -109,6 +114,46 @@ export const mockRoutes: MockRoute[] = [
     method: "GET",
     path: "/customer/profile",
     handler: () => customerProfile,
+  },
+  {
+    method: "GET",
+    path: "/api/customers/me",
+    handler: () => customerApi,
+  },
+  {
+    method: "GET",
+    path: "/api/orders",
+    handler: () => customerOrdersApi,
+  },
+  {
+    method: "GET",
+    path: "/api/orders/:id",
+    handler: ({ params }) => {
+      const order = customerOrdersApi.content.find(
+        (item) => String(item.id) === String(params.id),
+      );
+
+      return order
+        ? {
+            ...order,
+            items: [
+              {
+                productId: 7,
+                productTitle: "Auriculares inalámbricos",
+                sku: "AUD-007",
+                quantity: 1,
+                unitPrice: order.total,
+                subtotal: order.total,
+              },
+            ],
+          }
+        : null;
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/reviews/me",
+    handler: () => customerReviewsApi,
   },
   {
     method: "GET",

@@ -137,6 +137,15 @@ public class ReviewService {
                 .map(ReviewMapper::toDto);
     }
 
+    /** Reviews owned by the current customer, for the `/mi-cuenta` profile. */
+    @Transactional(readOnly = true)
+    public List<ReviewDto> listMine() {
+        String customerId = CurrentUser.id();
+        return reviewRepository.findAllByCustomerIdOrderByCreatedAtDesc(customerId).stream()
+                .map(ReviewMapper::toDto)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public Page<ReviewDto> listForModeration(String status, Long productId, Pageable pageable) {
         CurrentUser.requireAdmin();

@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
+import { logout } from "@/features/auth/services/auth.service";
+import { SESSION_EVENT } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
 const accountNavItems = [
   { label: "Resumen", href: "/mi-cuenta" },
   { label: "Mis pedidos", href: "/mi-cuenta/pedidos" },
+  { label: "Actividad", href: "/mi-cuenta/actividad" },
   { label: "Direcciones", href: "/mi-cuenta/direcciones" },
   { label: "Datos personales", href: "/mi-cuenta/datos" },
   { label: "Newsletter", href: "/mi-cuenta/newsletter" },
@@ -30,6 +33,14 @@ function isActive(pathname: string, href: string): boolean {
  */
 export function AccountNav() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await logout();
+    window.dispatchEvent(new Event(SESSION_EVENT));
+    router.push("/");
+    router.refresh();
+  }
 
   return (
     <aside className="w-full shrink-0 lg:w-[240px]">
@@ -70,13 +81,14 @@ export function AccountNav() {
 
         <span aria-hidden className="my-4 h-px bg-wf-line" />
 
-        <Link
-          href="/ingresar"
-          className="flex h-10 items-center gap-3 rounded-wf-sm px-3 text-sm text-wf-ink-secondary transition-colors hover:bg-wf-canvas"
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex h-10 w-full items-center gap-3 rounded-wf-sm px-3 text-left text-sm text-wf-ink-secondary transition-colors hover:bg-wf-canvas"
         >
           <span aria-hidden className="block size-5 shrink-0 rounded-wf-sm bg-wf-subtle" />
           Cerrar sesión
-        </Link>
+        </button>
       </nav>
     </aside>
   );

@@ -53,10 +53,16 @@ public class SecurityConfig {
                 .requestMatchers("/api/products/admin/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**")
                     .permitAll()
-                // Las lecturas de reseñas son públicas (sección "Reviews" del detalle
-                // de producto); la moderación administrativa exige el rol admin.
+                // Las reseñas del cliente son privadas; va ANTES del listado público
+                // por producto. La moderación administrativa exige el rol admin.
+                .requestMatchers(HttpMethod.GET, "/api/reviews/me").authenticated()
+                // Las lecturas de reseñas por producto son públicas (sección "Reviews"
+                // del detalle de producto).
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 .requestMatchers("/api/admin/reviews/**").hasRole(ADMIN_ROLE)
+                // La suscripción al newsletter es pública y no crea un perfil de cliente.
+                .requestMatchers(HttpMethod.POST, "/api/customers/newsletter/subscriptions")
+                    .permitAll()
                 // Perfil propio y autoprovision del cliente: cualquier usuario autenticado.
                 // Van ANTES del listado admin para que /me no caiga en /api/customers/*.
                 .requestMatchers(HttpMethod.POST, "/api/customers").authenticated()

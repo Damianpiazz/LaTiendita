@@ -5,6 +5,7 @@ import com.latiendita.reviewService.review.dto.ReviewDto;
 import com.latiendita.reviewService.review.dto.ReviewSummaryDto;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -38,6 +39,12 @@ public class ReviewController {
     @GetMapping("/summary")
     public ReviewSummaryDto summary(@RequestParam Long productId) {
         return reviewService.summary(productId);
+    }
+
+    /** Own reviews of the signed-in customer; public product listings stay on `/api/reviews`. */
+    @GetMapping("/me")
+    public List<ReviewDto> mine() {
+        return reviewService.listMine();
     }
 
     @PostMapping

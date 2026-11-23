@@ -135,3 +135,25 @@ export function sessionInitials(user: SessionUser): string {
 export function sessionLabel(user: SessionUser): string {
   return user.givenName ?? user.email.split("@")[0];
 }
+
+/** Longer identity for places where a first name alone would be ambiguous. */
+export function sessionFullName(user: SessionUser): string {
+  const fullName = `${user.givenName ?? ""} ${user.familyName ?? ""}`.trim();
+
+  return fullName || user.email.split("@")[0];
+}
+
+/** Human-facing role for the admin shell; admin takes precedence over client. */
+export function sessionRoleLabel(user: SessionUser): string {
+  const roles = user.roles.map((role) => role.trim().toLowerCase());
+
+  if (roles.includes("admin")) {
+    return "Administrador";
+  }
+
+  if (roles.includes("cliente")) {
+    return "Cliente";
+  }
+
+  return "Usuario";
+}

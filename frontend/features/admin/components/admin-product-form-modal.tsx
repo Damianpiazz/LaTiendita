@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 
-import { getAdminProductImages } from "@/features/admin/actions/product-actions";
+import {
+  getAdminProductDetail,
+  uploadAdminProductImage,
+} from "@/features/admin/actions/product-actions";
 import type {
   AdminCategory,
   AdminProduct,
   AdminProductPayload,
+  AdminProductSpec,
 } from "@/features/admin/types";
 
 const MIN_GALLERY_SLOTS = 3;
@@ -32,6 +36,36 @@ function gallerySlots(images: string[] | undefined): string[] {
   return [...filled, ...Array.from({ length: empty }, () => "")];
 }
 
+function textLines(values: string[] | string | undefined | null): string[] {
+  const raw = Array.isArray(values) ? values : values ? [values] : [];
+  return raw.flatMap((value) => value.split(/\r?\n/)).filter((value) => value.trim());
+}
+
+function specLines(specs: AdminProductSpec[] | undefined | null): string {
+  return (specs ?? [])
+    .map((spec) => `${spec.label}: ${spec.value}`)
+    .join("\n");
+}
+
+function parseSpecs(value: string): AdminProductSpec[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const separator = line.includes(":") ? ":" : "=";
+      const index = line.indexOf(separator);
+      if (index <= 0) return [];
+      return [
+        {
+          label: line.slice(0, index).trim(),
+          value: line.slice(index + 1).trim(),
+        },
+      ];
+    })
+    .filter((spec) => spec.label.length > 0 && spec.value.length > 0);
+}
+
 /** New/edit form of the design system: scrolling body, fixed footer. */
 export function AdminProductFormModal({
   product,
@@ -44,13 +78,22 @@ export function AdminProductFormModal({
     (category) => category.name === product?.category,
   );
   const [title, setTitle] = useState(product?.name ?? "");
+  const [slug, setSlug] = useState("");
   const [sku, setSku] = useState(product?.sku ?? "");
+  const [subcategory, setSubcategory] = useState("");
+  const [featured, setFeatured] = useState(false);
   const [category, setCategory] = useState(matchedCategory?.id ?? "");
   const [price, setPrice] = useState(String(product?.price ?? ""));
+  const [previousPrice, setPreviousPrice] = useState("");
+  const [fulfillment, setFulfillment] = useState("");
   const [stock, setStock] = useState(String(product?.stock ?? ""));
   const [description, setDescription] = useState(product?.description ?? "");
+  const [highlights, setHighlights] = useState("");
+  const [specs, setSpecs] = useState("");
   const [images, setImages] = useState<string[]>(gallerySlots(product?.images));
   const [published, setPublished] = useState(product?.published ?? true);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState("");
 
   useEffect(() => {
     if (!product) {
@@ -58,10 +101,26 @@ export function AdminProductFormModal({
     }
 
     let active = true;
-    void getAdminProductImages(rowId(product))
-      .then((detailImages) => {
-        if (active) {
-          setImages(gallerySlots(detailImages));
+    void getAdminProductDetail(rowId(product))
+      .then((detail) => {
+        if (!active) {
+          return;
+        }
+        setImages(gallerySlots(detail.images));
+        setSlug(detail.slug ?? "");
+        setSubcategory(detail.subcategory ?? "");
+        setFeatured(Boolean(detail.featured));
+        setPreviousPrice(
+          detail.originalPrice === null || detail.originalPrice === undefined
+            ? ""
+            : String(detail.originalPrice),
+        );
+        setFulfillment(detail.fulfillment ?? "");
+        setDescription(textLines(detail.description).join("\n") || product.description || "");
+        setHighlights(textLines(detail.highlights).join("\n"));
+        setSpecs(specLines(detail.specs));
+        if (detail.published !== null && detail.published !== undefined) {
+          setPublished(detail.published);
         }
       })
       .catch(() => {
@@ -95,8 +154,35 @@ export function AdminProductFormModal({
     );
   }
 
+  async function uploadImage(index: number, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setUploadError("");
+    setUploadingIndex(index);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploaded = await uploadAdminProductImage(formData);
+      setImageAt(index, uploaded.url);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir la imagen. Intentá de nuevo.",
+      );
+    } finally {
+      setUploadingIndex(null);
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const parsedSpecs = parseSpecs(specs);
+    const parsedHighlights = textLines(highlights).map((line) => line.trim());
     onSave({
       ...(product ? { productId: rowId(product) } : {}),
       title,
@@ -105,6 +191,13 @@ export function AdminProductFormModal({
       price: Number(price) || 0,
       quantity: Number(stock) || 0,
       ...(description.trim() ? { description: description.trim() } : {}),
+      ...(slug.trim() ? { slug: slug.trim() } : {}),
+      ...(subcategory.trim() ? { subcategory: subcategory.trim() } : {}),
+      featured,
+      ...(previousPrice.trim() ? { originalPrice: Number(previousPrice) } : {}),
+      ...(fulfillment.trim() ? { fulfillment: fulfillment.trim() } : {}),
+      ...(parsedHighlights.length > 0 ? { highlights: parsedHighlights } : {}),
+      specs: parsedSpecs,
       images: images.map((image) => image.trim()).filter(Boolean),
       published,
     });
@@ -169,11 +262,28 @@ export function AdminProductFormModal({
 
                 <div className="flex flex-wrap gap-2">
                   {images.map((image, index) => (
-                    <div key={index} className="relative flex size-20 flex-col gap-1">
-                      <label
-                        htmlFor={`product-image-${index}`}
-                        className="sr-only"
-                      >
+                    <div key={index} className="relative flex w-20 flex-col gap-1">
+                      <div className="relative size-20 overflow-hidden rounded-wf-sm border border-wf-line-strong bg-wf-canvas">
+                        {image.trim() ? (
+                          <div
+                            aria-hidden
+                            className="size-full bg-cover bg-center"
+                            style={{
+                              backgroundImage: `url("${image.replace(/"/g, "%22")}")`,
+                            }}
+                          />
+                        ) : (
+                          <span className="flex size-full items-center justify-center text-xs text-wf-ink-placeholder">
+                            [ {index + 1} ]
+                          </span>
+                        )}
+                      </div>
+                      {index === 0 ? (
+                        <span className="absolute -top-2 left-1 rounded-full bg-wf-inverse px-1 text-[10px] font-medium text-wf-on-inverse">
+                          Principal
+                        </span>
+                      ) : null}
+                      <label htmlFor={`product-image-${index}`} className="sr-only">
                         Imagen {index + 1}
                       </label>
                       <input
@@ -181,24 +291,38 @@ export function AdminProductFormModal({
                         value={image}
                         onChange={(event) => setImageAt(index, event.target.value)}
                         placeholder={`[ ${index + 1} ]`}
-                        className="size-full rounded-wf-sm border border-wf-line-strong bg-wf-surface px-1 text-center text-xs text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
+                        className="h-8 w-full rounded-wf-sm border border-wf-line-strong bg-wf-surface px-1 text-center text-xs text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
                       />
-                      {index === 0 ? (
-                        <span className="absolute -top-2 left-1 rounded-full bg-wf-inverse px-1 text-[10px] font-medium text-wf-on-inverse">
-                          Principal
-                        </span>
-                      ) : null}
+                      <label
+                        htmlFor={`product-image-file-${index}`}
+                        className="cursor-pointer text-center text-[10px] text-wf-ink-secondary underline"
+                      >
+                        {uploadingIndex === index ? "Subiendo…" : "Subir archivo"}
+                      </label>
+                      <input
+                        id={`product-image-file-${index}`}
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingIndex !== null}
+                        onChange={(event) => void uploadImage(index, event)}
+                        className="sr-only"
+                      />
                       <button
                         type="button"
                         aria-label={`Quitar imagen ${index + 1}`}
                         onClick={() => removeImage(index)}
-                        className="absolute -right-1 -top-2 flex size-5 items-center justify-center rounded-full border border-wf-line-strong bg-wf-surface text-xs text-wf-ink-secondary"
+                        className="absolute -right-1 top-7 flex size-5 items-center justify-center rounded-full border border-wf-line-strong bg-wf-surface text-xs text-wf-ink-secondary"
                       >
                         ×
                       </button>
                     </div>
                   ))}
                 </div>
+                {uploadError ? (
+                  <p role="alert" className="text-xs font-medium text-wf-ink">
+                    {uploadError}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -232,6 +356,37 @@ export function AdminProductFormModal({
                 </div>
               </div>
 
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="product-slug"
+                    className="text-sm font-medium text-wf-ink"
+                  >
+                    Slug
+                  </label>
+                  <input
+                    id="product-slug"
+                    value={slug}
+                    onChange={(event) => setSlug(event.target.value)}
+                    className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-sm text-wf-ink outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="product-subcategory"
+                    className="text-sm font-medium text-wf-ink"
+                  >
+                    Subcategoría
+                  </label>
+                  <input
+                    id="product-subcategory"
+                    value={subcategory}
+                    onChange={(event) => setSubcategory(event.target.value)}
+                    className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-sm text-wf-ink outline-none"
+                  />
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <label
                   htmlFor="product-category"
@@ -254,7 +409,7 @@ export function AdminProductFormModal({
                 </select>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="flex flex-col gap-2">
                   <label
                     htmlFor="product-price"
@@ -267,6 +422,21 @@ export function AdminProductFormModal({
                     type="number"
                     value={price}
                     onChange={(event) => setPrice(event.target.value)}
+                    className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-sm text-wf-ink outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="product-previous-price"
+                    className="text-sm font-medium text-wf-ink"
+                  >
+                    Valor anterior
+                  </label>
+                  <input
+                    id="product-previous-price"
+                    type="number"
+                    value={previousPrice}
+                    onChange={(event) => setPreviousPrice(event.target.value)}
                     className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-sm text-wf-ink outline-none"
                   />
                 </div>
@@ -289,6 +459,22 @@ export function AdminProductFormModal({
 
               <div className="flex flex-col gap-2">
                 <label
+                  htmlFor="product-fulfillment"
+                  className="text-sm font-medium text-wf-ink"
+                >
+                  Plazo de entrega
+                </label>
+                <input
+                  id="product-fulfillment"
+                  value={fulfillment}
+                  onChange={(event) => setFulfillment(event.target.value)}
+                  placeholder="Ej. 24/48 hs"
+                  className="h-10 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3 text-sm text-wf-ink outline-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label
                   htmlFor="product-description"
                   className="text-sm font-medium text-wf-ink"
                 >
@@ -302,20 +488,70 @@ export function AdminProductFormModal({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  id="product-published"
-                  type="checkbox"
-                  checked={published}
-                  onChange={(event) => setPublished(event.target.checked)}
-                  className="size-5 rounded-wf-sm border border-wf-line-strong"
-                />
-                <label
-                  htmlFor="product-published"
-                  className="text-sm text-wf-ink"
-                >
-                  Publicado
-                </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="product-highlights"
+                    className="text-sm font-medium text-wf-ink"
+                  >
+                    Puntos destacados
+                  </label>
+                  <textarea
+                    id="product-highlights"
+                    value={highlights}
+                    onChange={(event) => setHighlights(event.target.value)}
+                    placeholder="Uno por línea"
+                    className="h-24 rounded-wf-sm border border-wf-line-strong bg-wf-surface p-3 text-sm text-wf-ink outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="product-specs"
+                    className="text-sm font-medium text-wf-ink"
+                  >
+                    Especificaciones
+                  </label>
+                  <textarea
+                    id="product-specs"
+                    value={specs}
+                    onChange={(event) => setSpecs(event.target.value)}
+                    placeholder="Etiqueta: valor, uno por línea"
+                    className="h-24 rounded-wf-sm border border-wf-line-strong bg-wf-surface p-3 text-sm text-wf-ink outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="product-published"
+                    type="checkbox"
+                    checked={published}
+                    onChange={(event) => setPublished(event.target.checked)}
+                    className="size-5 rounded-wf-sm border border-wf-line-strong"
+                  />
+                  <label
+                    htmlFor="product-published"
+                    className="text-sm text-wf-ink"
+                  >
+                    Publicado
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="product-featured"
+                    type="checkbox"
+                    checked={featured}
+                    onChange={(event) => setFeatured(event.target.checked)}
+                    className="size-5 rounded-wf-sm border border-wf-line-strong"
+                  />
+                  <label
+                    htmlFor="product-featured"
+                    className="text-sm text-wf-ink"
+                  >
+                    Destacado
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -333,7 +569,8 @@ export function AdminProductFormModal({
             </button>
             <button
               type="submit"
-              className="flex h-10 w-[160px] items-center justify-center rounded-wf-sm bg-wf-inverse text-sm font-medium text-wf-on-inverse"
+              disabled={uploadingIndex !== null}
+              className="flex h-10 w-[160px] items-center justify-center rounded-wf-sm bg-wf-inverse text-sm font-medium text-wf-on-inverse disabled:opacity-60"
             >
               {product ? "Guardar cambios" : "Guardar producto"}
             </button>

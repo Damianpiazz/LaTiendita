@@ -2,19 +2,30 @@ import type { CustomerOrderStatus } from "@/features/customer/types";
 import { cn } from "@/lib/utils";
 
 /**
- * 24px pill of the purchases table, in the two states the frame draws.
- *
- * The activity rows use a wider vocabulary (`Publicada`, `Actualizado`), so the
- * two badges stay separate instead of sharing one map.
+ * 24px pill of the purchases table. The wireframe draws `Entregado` and
+ * `Enviado`; backend orders also arrive as pending/paid/cancelled, so those
+ * states reuse the same neutral palette instead of inventing new colors.
  */
 const statusStyles: Record<CustomerOrderStatus, { label: string; className: string }> = {
-  entregado: {
-    label: "Entregado",
-    className: "bg-wf-inverse text-wf-on-inverse",
+  pendiente: {
+    label: "Pendiente",
+    className: "bg-wf-subtle text-wf-ink-secondary",
+  },
+  pagado: {
+    label: "Pagado",
+    className: "border border-wf-line-strong text-wf-ink-secondary",
   },
   enviado: {
     label: "Enviado",
     className: "bg-wf-subtle text-wf-ink-secondary",
+  },
+  entregado: {
+    label: "Entregado",
+    className: "bg-wf-inverse text-wf-on-inverse",
+  },
+  cancelado: {
+    label: "Cancelado",
+    className: "border border-wf-line-strong text-wf-ink-muted",
   },
 };
 

@@ -248,6 +248,20 @@ class ReviewServiceTest {
     }
 
     @Test
+    void shouldListOnlyTheCurrentCustomersReviews() {
+        ReviewEntity own = review(ReviewStatus.APPROVED, CUSTOMER);
+        when(reviewRepository.findAllByCustomerIdOrderByCreatedAtDesc(CUSTOMER))
+                .thenReturn(List.of(own));
+
+        var reviews = reviewService.listMine();
+
+        assertThat(reviews).hasSize(1);
+        assertThat(reviews.get(0).customerId()).isEqualTo(CUSTOMER);
+        assertThat(reviews.get(0).status()).isEqualTo(ReviewStatus.APPROVED);
+        verify(reviewRepository).findAllByCustomerIdOrderByCreatedAtDesc(CUSTOMER);
+    }
+
+    @Test
     void shouldRequireAdminRoleForModeration() {
         setGatewayHeaders(CUSTOMER, "cliente");
 

@@ -1,3 +1,4 @@
+import { ADMIN_RANGE_OPTIONS } from "@/features/admin/helpers/admin-range";
 import type {
   AdminPaymentStatus,
   AdminPaymentStatusFilter,
@@ -24,19 +25,18 @@ const counts = (payments: AdminPayments) => ({
 type AdminPaymentsFiltersProps = {
   payments: AdminPayments;
   status: AdminPaymentStatusFilter;
+  days: number;
   onStatusChange: (status: AdminPaymentStatusFilter) => void;
+  onDaysChange: (days: number) => void;
 };
 
-/**
- * Settlement tabs and the 30-day period control above the payments table.
- *
- * Counts come from the real summary; the period control stays presentational
- * because the frame draws no menu and the adapter always requests 30 days.
- */
+/** Settlement tabs and the date range selector above the payments table. */
 export function AdminPaymentsFilters({
   payments,
   status,
+  days,
   onStatusChange,
+  onDaysChange,
 }: AdminPaymentsFiltersProps) {
   const tabCounts = counts(payments);
 
@@ -73,13 +73,24 @@ export function AdminPaymentsFilters({
         })}
       </div>
 
-      <span className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
-        <span className="text-wf-ink-muted">Rango:</span>
-        <span className="font-medium text-wf-ink">{payments.rangeLabel}</span>
-        <span aria-hidden className="text-wf-ink-placeholder">
-          ↓
-        </span>
-      </span>
+      <div className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
+        <label htmlFor="admin-payments-range" className="text-wf-ink-muted">
+          Rango:
+        </label>
+        <select
+          id="admin-payments-range"
+          aria-label="Rango de pagos"
+          value={days}
+          onChange={(event) => onDaysChange(Number(event.target.value))}
+          className="bg-transparent font-medium text-wf-ink outline-none"
+        >
+          {ADMIN_RANGE_OPTIONS.map((option) => (
+            <option key={option.days} value={option.days}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

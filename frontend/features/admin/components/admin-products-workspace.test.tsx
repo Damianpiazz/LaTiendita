@@ -14,7 +14,8 @@ const actions = vi.hoisted(() => ({
   publishAdminProducts: vi.fn(),
   deleteAdminProducts: vi.fn(),
   exportAdminProducts: vi.fn(),
-  getAdminProductImages: vi.fn(),
+  getAdminProductDetail: vi.fn(),
+  uploadAdminProductImage: vi.fn(),
 }));
 
 vi.mock("@/features/admin/actions/product-actions", () => actions);
@@ -105,11 +106,17 @@ describe("AdminProductsWorkspace", () => {
       filename: "productos.csv",
       content: "sku,name\nREM-BLA,Remera blanca\n",
     });
-    actions.getAdminProductImages.mockResolvedValue([
-      "/images/remera-1.jpg",
-      "/images/remera-2.jpg",
-      "/images/remera-3.jpg",
-    ]);
+    actions.getAdminProductDetail.mockResolvedValue({
+      images: [
+        "/images/remera-1.jpg",
+        "/images/remera-2.jpg",
+        "/images/remera-3.jpg",
+      ],
+    });
+    actions.uploadAdminProductImage.mockResolvedValue({
+      key: "productos/nueva.png",
+      url: "/api/products/images/productos/nueva.png",
+    });
   });
 
   afterEach(() => {
@@ -329,7 +336,7 @@ describe("AdminProductsWorkspace", () => {
     expect(within(dialog).getByLabelText(/Publicado/)).toBeChecked();
 
     await waitFor(() =>
-      expect(actions.getAdminProductImages).toHaveBeenCalledWith("11"),
+      expect(actions.getAdminProductDetail).toHaveBeenCalledWith("11"),
     );
     await waitFor(() =>
       expect(within(dialog).getByLabelText("Imagen 1")).toHaveValue(
@@ -353,6 +360,27 @@ describe("AdminProductsWorkspace", () => {
           ],
           published: true,
         }),
+      ),
+    );
+  });
+
+  it("uploads a file from the file dialog and stores the returned URL", async () => {
+    renderWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: "+ Nuevo producto" }));
+    const dialog = screen.getByRole("dialog");
+    const file = new File(["bytes"], "foto.png", { type: "image/png" });
+    const input = within(dialog).getAllByLabelText("Subir archivo")[0];
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() =>
+      expect(actions.uploadAdminProductImage).toHaveBeenCalledTimes(1),
+    );
+    const sent = actions.uploadAdminProductImage.mock.calls[0][0] as FormData;
+    expect(sent.get("file")).toBe(file);
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText("Imagen 1")).toHaveValue(
+        "/api/products/images/productos/nueva.png",
       ),
     );
   });

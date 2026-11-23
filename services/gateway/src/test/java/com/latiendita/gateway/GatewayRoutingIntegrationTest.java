@@ -93,6 +93,23 @@ class GatewayRoutingIntegrationTest {
     }
 
     @Test
+    void rechazaSinTokenLasResenasPropias() {
+        ResponseEntity<String> response = rest.getForEntity("/api/reviews/me", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void enrutaConTokenLasResenasPropias() {
+        String token = TestJwtFactory.token(42);
+        ResponseEntity<String> response = rest.exchange("/api/reviews/me", HttpMethod.GET,
+                new HttpEntity<>(authHeaders(token)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(lastUserHeader).isEqualTo("42");
+        assertThat(lastRequestPath).isEqualTo("/api/reviews/me");
+    }
+
+    @Test
     void enrutaConTokenEInyectaXUserId() {
         String token = TestJwtFactory.token(42);
         ResponseEntity<String> response = rest.exchange("/api/orders", HttpMethod.GET,

@@ -3,6 +3,7 @@ import type {
   AdminOrders,
   AdminPaymentMethod,
 } from "@/features/admin/types";
+import { adminRangeLabel } from "./admin-range";
 import { formatAdminDateLabel, mapOrderStatus } from "./admin-summary.mapper";
 
 export type AdminOrderApi = {
@@ -10,6 +11,8 @@ export type AdminOrderApi = {
   orderNumber: string;
   customerId: string;
   customerEmail?: string | null;
+  /** Resolved by the admin BFF from the customer endpoint when absent. */
+  customerName?: string | null;
   paymentMethod?: string | null;
   status: string;
   total: number | string;
@@ -54,7 +57,7 @@ export function mapPaymentMethod(value?: string | null): AdminPaymentMethod {
 export function mapAdminOrder(api: AdminOrderApi): AdminOrder {
   return {
     id: shortOrderId(api.orderNumber, api.id),
-    customer: api.customerId || "Cliente",
+    customer: api.customerName?.trim() || api.customerId || "Cliente",
     email: api.customerEmail?.trim() || api.customerId || "—",
     placedAt: formatAdminDateLabel(new Date(api.createdAt)),
     itemCount: api.itemCount,
@@ -68,6 +71,7 @@ export function mapAdminOrders(args: {
   items: AdminOrderApi[];
   stats: AdminOrderStatsApi;
   pageSize: number;
+  rangeDays?: number;
 }): AdminOrders {
   const statusCounts = args.stats.statusCounts;
   return {
@@ -84,6 +88,6 @@ export function mapAdminOrders(args: {
       entregado: statusCounts.entregado,
       cancelado: statusCounts.cancelado,
     },
-    rangeLabel: "Últimos 30 días",
+    rangeLabel: adminRangeLabel(args.rangeDays ?? 30),
   };
 }

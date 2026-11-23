@@ -8,6 +8,12 @@ import {
   type AdminNavItem,
 } from "@/features/admin/config/admin-nav";
 import type { AdminNavigationCounts } from "@/features/admin/types";
+import {
+  sessionFullName,
+  sessionInitials,
+  sessionRoleLabel,
+  type SessionUser,
+} from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
 /** `/admin` only matches itself; the rest also own their subroutes. */
@@ -24,7 +30,13 @@ function isActive(pathname: string, href: string): boolean {
  * path and a layout never receives it. The footer sits directly after the nav
  * block exactly where the frame draws it, not anchored to the viewport.
  */
-export function AdminSidebar({ counts }: { counts: AdminNavigationCounts }) {
+export function AdminSidebar({
+  counts,
+  user,
+}: {
+  counts: AdminNavigationCounts;
+  user: SessionUser | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -63,13 +75,20 @@ export function AdminSidebar({ counts }: { counts: AdminNavigationCounts }) {
           Ver tienda ↗
         </Link>
 
-        <div className="flex items-center gap-3 px-2">
+        <div
+          className="flex items-center gap-3 px-2"
+          title={user ? `${user.email} · ${sessionRoleLabel(user)}` : "Sin sesión"}
+        >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-wf-subtle text-xs font-bold text-wf-ink-secondary">
-            DP
+            {user ? sessionInitials(user) : "--"}
           </span>
           <span className="flex min-w-0 flex-col gap-1">
-            <span className="truncate text-sm font-medium text-wf-ink">Damián Pérez</span>
-            <span className="text-xs text-wf-ink-muted">Administrador</span>
+            <span className="truncate text-sm font-medium text-wf-ink">
+              {user ? sessionFullName(user) : "Sin sesión"}
+            </span>
+            <span className="text-xs text-wf-ink-muted">
+              {user ? sessionRoleLabel(user) : "Invitado"}
+            </span>
           </span>
         </div>
       </div>

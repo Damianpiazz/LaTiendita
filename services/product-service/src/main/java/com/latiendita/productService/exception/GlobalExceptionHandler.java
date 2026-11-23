@@ -48,6 +48,16 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "Sort inválido", ex.getMessage());
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail onInvalidArgument(IllegalArgumentException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Solicitud inválida", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail onInvalidState(IllegalStateException ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Servicio no disponible", ex.getMessage());
+    }
+
     /**
      * Red de seguridad: todo lo que Spring Data considera "uso inválido de la
      * API" es un problema del request, no del servidor, así que responde 400 y

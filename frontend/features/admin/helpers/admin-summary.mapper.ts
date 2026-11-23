@@ -150,14 +150,14 @@ export function buildRecentActivity(
       status === "pagado"
         ? `Pago acreditado ${id} · $ ${toNumber(order.total).toLocaleString("es-AR")}`
         : `Nuevo pedido ${id} de ${order.customerId || "cliente"} · $ ${toNumber(order.total).toLocaleString("es-AR")}`;
-    return { id: `order-${order.id}`, text, time: relativeTime(order.createdAt, now) };
+    return { id: `order-${order.id}`, text, when: relativeTime(order.createdAt, now) };
   });
 
   for (const product of lowStock.slice(0, Math.max(0, 5 - entries.length))) {
     entries.push({
       id: `stock-${product.sku}`,
       text: `Stock bajo ${product.name} · quedan ${product.quantity} u.`,
-      time: "Revisar inventario",
+      when: "Revisar inventario",
     });
   }
 

@@ -9,25 +9,34 @@ import { CategoryTile } from "./category-tile";
 
 const ALL_FILTER = "todas";
 
-/** Order the mock catalog already returns; the frame has no menu for it. */
-const SORT_LABEL = "Destacados";
+const SORT_OPTIONS = [
+  { value: "featured", label: "Destacados" },
+  { value: "name", label: "Nombre A–Z" },
+] as const;
+
+type SortValue = (typeof SORT_OPTIONS)[number]["value"];
 
 /**
  * Title row, toolbar and grid of the categories screen.
  *
  * It is a client component because the filter strip is stateful: selecting a
  * category narrows the grid in place, which is what the pills of the frame
- * look like they do. The sort control stays presentational because the design
- * draws no menu for it.
+ * look like they do; the sort control orders the same list in place.
  */
 export function CategoryCatalog({ categories }: { categories: Category[] }) {
   const [activeFilter, setActiveFilter] = useState<string>(ALL_FILTER);
+  const [sort, setSort] = useState<SortValue>("featured");
 
   const filters = categories.filter((category) => category.featured).slice(0, 4);
-  const visible =
+  const filtered =
     activeFilter === ALL_FILTER
       ? categories
       : categories.filter((category) => category.id === activeFilter);
+  const visible = [...filtered].sort((a, b) =>
+    sort === "name"
+      ? a.name.localeCompare(b.name, "es")
+      : Number(b.featured) - Number(a.featured) || a.name.localeCompare(b.name, "es"),
+  );
 
   const totalLabel = categories.length === 1 ? "categoría" : "categorías";
   const visibleLabel = visible.length === 1 ? "categoría" : "categorías";
@@ -64,11 +73,21 @@ export function CategoryCatalog({ categories }: { categories: Category[] }) {
         </div>
 
         <div className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
-          <span className="text-wf-ink-muted">Ordenar por:</span>
-          <span className="font-medium text-wf-ink">{SORT_LABEL}</span>
-          <span aria-hidden className="text-wf-ink-placeholder">
-            ↓
-          </span>
+          <label htmlFor="category-sort" className="text-wf-ink-muted">
+            Ordenar por:
+          </label>
+          <select
+            id="category-sort"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as SortValue)}
+            className="bg-transparent font-medium text-wf-ink outline-none"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

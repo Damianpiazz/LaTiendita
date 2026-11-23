@@ -1,12 +1,9 @@
+import Link from "next/link";
+
 import type { CustomerProfile } from "@/features/customer/types";
 
-/**
- * Page header of `/mi-cuenta`: greeting over the subtitle, with the outlined
- * `Editar perfil` control on the right.
- *
- * No profile edition flow exists in the mock, so the control is presentational
- * — the same criterion the admin page headers use for their actions.
- */
+/** Page header of `/mi-cuenta`: greeting over the subtitle, with the outlined
+ * `Editar perfil` control on the right. */
 export function ProfileHeader({ profile }: { profile: CustomerProfile }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-4">
@@ -17,9 +14,12 @@ export function ProfileHeader({ profile }: { profile: CustomerProfile }) {
         </p>
       </div>
 
-      <span className="flex h-10 shrink-0 items-center rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm font-medium text-wf-ink-secondary">
+      <Link
+        href="/mi-cuenta/datos"
+        className="flex h-10 shrink-0 items-center rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm font-medium text-wf-ink-secondary transition-colors hover:bg-wf-canvas"
+      >
         Editar perfil
-      </span>
+      </Link>
     </header>
   );
 }

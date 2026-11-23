@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -94,5 +95,33 @@ export async function saveShippingAddress(
     };
   }
 
-  redirect("/checkout/pago");
+  const requested = readText(formData.get("next"));
+  // Only internal absolute paths are accepted: an external value would turn
+  // this action into an open redirect.
+  const next = requested.startsWith("/") && !requested.startsWith("//") ? requested : "";
+  redirect(next || "/checkout/pago");
+}
+
+export async function deleteShippingAddress(addressId: number): Promise<void> {
+  const jar = await cookies();
+  const token = jar.get(ACCESS_TOKEN_COOKIE)?.value;
+
+  if (!token) {
+    redirect("/ingresar?next=%2Fmi-cuenta%2Fdirecciones");
+  }
+
+  try {
+    await httpClient.delete(`/api/shipments/addresses/${addressId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    if (statusOf(error) === 401 || statusOf(error) === 403) {
+      redirect("/ingresar?next=%2Fmi-cuenta%2Fdirecciones");
+    }
+
+    throw error;
+  }
+
+  revalidatePath("/mi-cuenta/direcciones");
+  revalidatePath("/checkout/envio");
 }

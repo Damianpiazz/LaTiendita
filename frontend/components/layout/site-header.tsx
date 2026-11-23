@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { siteConfig } from "@/config/site";
@@ -27,6 +28,16 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ account }: SiteHeaderProps = {}) {
   const router = useRouter();
+  const [search, setSearch] = useState("");
+
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = search.trim();
+
+    if (!query) return;
+
+    router.push(`/productos?q=${encodeURIComponent(query)}`);
+  }
 
   async function handleLogout() {
     await logout();
@@ -58,8 +69,9 @@ export function SiteHeader({ account }: SiteHeaderProps = {}) {
         </nav>
 
         <div className="flex items-center gap-3">
-          <div
+          <form
             role="search"
+            onSubmit={handleSearch}
             className="hidden h-10 w-[260px] items-center rounded-wf-sm border border-wf-line-strong bg-wf-surface px-3.5 md:flex"
           >
             <label htmlFor="site-search" className="sr-only">
@@ -68,10 +80,12 @@ export function SiteHeader({ account }: SiteHeaderProps = {}) {
             <input
               id="site-search"
               type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder={siteConfig.searchPlaceholder}
               className="h-full w-full bg-transparent text-sm text-wf-ink outline-none placeholder:text-wf-ink-placeholder"
             />
-          </div>
+          </form>
 
           <CartBadge />
 

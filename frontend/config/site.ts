@@ -17,6 +17,17 @@ export type FooterColumn = {
 };
 
 /**
+ * Public contact endpoints. Replace these values with the store's real
+ * accounts before launch; they are kept in one place so the header, footer
+ * and newsletter never drift apart.
+ */
+const contact = {
+  email: "hola@latiendita.com",
+  whatsapp: "https://wa.me/5491122334455",
+  instagram: "https://www.instagram.com/latiendita/",
+} as const;
+
+/**
  * Static copy and navigation shared by the public shell.
  *
  * Anything that comes from the catalog API (categories, products) is not here.
@@ -32,6 +43,7 @@ export const siteConfig = {
     { label: "Contacto", href: "#contacto" },
   ] satisfies NavItem[],
   searchPlaceholder: "Buscar productos...",
+  contact,
   benefits: [
     {
       icon: "shipping",
@@ -66,9 +78,9 @@ export const siteConfig = {
     tagline:
       "Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae.",
     socials: [
-      { label: "Instagram", href: "#" },
-      { label: "WhatsApp", href: "#" },
-      { label: "Email", href: "#" },
+      { label: "Instagram", href: contact.instagram },
+      { label: "WhatsApp", href: contact.whatsapp },
+      { label: "Email", href: `mailto:${contact.email}` },
     ] satisfies NavItem[],
     columns: [
       {
@@ -82,17 +94,17 @@ export const siteConfig = {
       {
         title: "Ayuda",
         links: [
-          { label: "Envíos", href: "#" },
-          { label: "Devoluciones", href: "#" },
-          { label: "Preguntas frecuentes", href: "#" },
+          { label: "Envíos", href: "/envios" },
+          { label: "Devoluciones", href: "/devoluciones" },
+          { label: "Preguntas frecuentes", href: "/faq" },
         ],
       },
       {
         title: "Contacto",
         links: [
-          { label: "WhatsApp", href: "#" },
-          { label: "Email", href: "#" },
-          { label: "Instagram", href: "#" },
+          { label: "WhatsApp", href: contact.whatsapp },
+          { label: "Email", href: `mailto:${contact.email}` },
+          { label: "Instagram", href: contact.instagram },
         ],
       },
     ] satisfies FooterColumn[],

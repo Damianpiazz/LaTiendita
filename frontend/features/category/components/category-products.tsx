@@ -9,8 +9,31 @@ import { cn } from "@/lib/utils";
 const ALL_FILTER = "todos";
 const PAGE_SIZE = 12;
 
-/** Order the mock catalog already returns; the frame has no menu for it. */
-const SORT_LABEL = "Destacados";
+const SORT_OPTIONS = [
+  { value: "featured", label: "Destacados" },
+  { value: "name", label: "Nombre A–Z" },
+  { value: "price-asc", label: "Menor precio" },
+  { value: "price-desc", label: "Mayor precio" },
+] as const;
+
+type SortValue = (typeof SORT_OPTIONS)[number]["value"];
+
+function sortProducts(products: Product[], sort: SortValue): Product[] {
+  const result = [...products];
+
+  switch (sort) {
+    case "name":
+      return result.sort((a, b) => a.name.localeCompare(b.name, "es"));
+    case "price-asc":
+      return result.sort((a, b) => a.price - b.price);
+    case "price-desc":
+      return result.sort((a, b) => b.price - a.price);
+    default:
+      return result.sort(
+        (a, b) => Number(b.featured) - Number(a.featured) || a.name.localeCompare(b.name, "es"),
+      );
+  }
+}
 
 type CategoryProductsProps = {
   category: Category;
@@ -22,18 +45,20 @@ type CategoryProductsProps = {
  *
  * It is a client component because the filter strip and the page numbers are
  * state: selecting a subcategory narrows the grid and goes back to page one.
- * The sort control stays presentational because the design draws no menu for
- * it, same as on `/categorias`.
+ * The sort control orders the visible products in place.
  */
 export function CategoryProducts({ category, products }: CategoryProductsProps) {
   const [activeFilter, setActiveFilter] = useState<string>(ALL_FILTER);
+  const [sort, setSort] = useState<SortValue>("featured");
   const [page, setPage] = useState(1);
 
   const filters = Array.from(new Set(products.map((product) => product.subcategory)));
-  const filtered =
+  const filtered = sortProducts(
     activeFilter === ALL_FILTER
       ? products
-      : products.filter((product) => product.subcategory === activeFilter);
+      : products.filter((product) => product.subcategory === activeFilter),
+    sort,
+  );
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -87,11 +112,24 @@ export function CategoryProducts({ category, products }: CategoryProductsProps) 
             </div>
 
             <div className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
-              <span className="text-wf-ink-muted">Ordenar por:</span>
-              <span className="font-medium text-wf-ink">{SORT_LABEL}</span>
-              <span aria-hidden className="text-wf-ink-placeholder">
-                ↓
-              </span>
+              <label htmlFor="products-sort" className="text-wf-ink-muted">
+                Ordenar por:
+              </label>
+              <select
+                id="products-sort"
+                value={sort}
+                onChange={(event) => {
+                  setSort(event.target.value as SortValue);
+                  setPage(1);
+                }}
+                className="bg-transparent font-medium text-wf-ink outline-none"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

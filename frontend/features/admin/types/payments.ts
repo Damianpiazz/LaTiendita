@@ -53,4 +53,6 @@ export type AdminPaymentsQuery = {
   page?: number;
   size?: number;
   sort?: string;
+  /** Days forwarded to both the payments list and its summary. */
+  days?: number;
 };

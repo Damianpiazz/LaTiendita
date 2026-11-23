@@ -7,8 +7,20 @@ import {
   USER_COOKIE,
   decodeUserCookie,
 } from "@/lib/auth/session";
-import { mapCustomerDtoToProfile, type CustomerDto } from "@/lib/customers/profile";
+import {
+  mapCustomerDtoToProfile,
+  type CustomerDto,
+  type CustomerOrderDto,
+  type CustomerProfileSources,
+  type CustomerReviewDto,
+} from "@/lib/customers/profile";
 import { httpClient } from "@/lib/http/client";
+
+type AuthHeaders = { Authorization: string };
+
+type Page<T> = { content?: T[]; totalElements?: number };
+
+const OWN_ORDERS_SIZE = 100;
 
 function statusOf(error: unknown): number | undefined {
   if (error && typeof error === "object" && "response" in error) {
@@ -20,12 +32,42 @@ function statusOf(error: unknown): number | undefined {
 }
 
 /**
+ * Orders and reviews are supplementary: a failure in either service must not
+ * hide the identity already loaded from customer-service.
+ */
+async function loadProfileSources(headers: AuthHeaders): Promise<CustomerProfileSources> {
+  const [orders, reviews] = await Promise.allSettled([
+    httpClient.get<Page<CustomerOrderDto> | CustomerOrderDto[]>("/api/orders", {
+      params: { page: 0, size: OWN_ORDERS_SIZE, sort: "createdAt,desc" },
+      headers,
+    }),
+    httpClient.get<CustomerReviewDto[] | Page<CustomerReviewDto>>("/api/reviews/me", {
+      headers,
+    }),
+  ]);
+
+  if (orders.status === "rejected") {
+    console.warn("No se pudieron cargar los pedidos del perfil", orders.reason);
+  }
+  if (reviews.status === "rejected") {
+    console.warn("No se pudieron cargar las reseñas del perfil", reviews.reason);
+  }
+
+  return {
+    orders: orders.status === "fulfilled" ? orders.value.data : [],
+    reviews: reviews.status === "fulfilled" ? reviews.value.data : [],
+  };
+}
+
+/**
  * Loads the signed-in customer's own record from customer-service. The httpOnly
  * JWT is read on the server and sent to the gateway; no profile is shared
  * between accounts. A first-time customer is provisioned once from the session
  * identity, using the service's idempotent creation endpoint.
  */
-export async function getCustomerProfile(): Promise<CustomerProfile> {
+export async function getCustomerProfile(
+  options: { activityLimit?: number } = {},
+): Promise<CustomerProfile> {
   const jar = await cookies();
   const token = jar.get(ACCESS_TOKEN_COOKIE)?.value;
 
@@ -33,12 +75,12 @@ export async function getCustomerProfile(): Promise<CustomerProfile> {
     redirect("/ingresar");
   }
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers: AuthHeaders = { Authorization: `Bearer ${token}` };
 
   try {
     const { data } = await httpClient.get<CustomerDto>("/api/customers/me", { headers });
 
-    return mapCustomerDtoToProfile(data);
+    return mapCustomerDtoToProfile(data, await loadProfileSources(headers), options.activityLimit);
   } catch (error) {
     const status = statusOf(error);
 
@@ -85,6 +127,6 @@ export async function getCustomerProfile(): Promise<CustomerProfile> {
       }
     }
 
-    return mapCustomerDtoToProfile(customer);
+    return mapCustomerDtoToProfile(customer, await loadProfileSources(headers), options.activityLimit);
   }
 }

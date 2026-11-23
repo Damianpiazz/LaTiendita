@@ -43,4 +43,6 @@ export type AdminOrdersQuery = {
   page?: number;
   size?: number;
   sort?: string;
+  /** Size of the `from`/`to` window sent to the admin orders endpoint. */
+  days?: number;
 };

@@ -17,10 +17,12 @@ import {
   createAdminProduct,
   deleteAdminProducts,
   exportAdminProducts,
+  getAdminProductDetail,
   getAdminProductImages,
   listAdminProducts,
   publishAdminProducts,
   updateAdminProduct,
+  uploadAdminProductImage,
   type AdminProductPayload,
 } from "./product-actions";
 
@@ -67,7 +69,11 @@ describe("admin product actions", () => {
         categoryId: 7,
         price: 49999,
         quantity: 12,
+        featured: false,
+        imageUrl: "/images/auriculares-1.jpg",
         description: ["Sonido bluetooth con estuche."],
+        highlights: [],
+        specs: [],
         images: ["/images/auriculares-1.jpg", "/images/auriculares-2.jpg"],
         published: true,
       },
@@ -211,6 +217,67 @@ describe("admin product actions", () => {
     await expect(getAdminProductImages("42")).resolves.toEqual([
       "/images/legacy.jpg",
     ]);
+  });
+
+  it("reads every editable catalog field when editing", async () => {
+    const get = vi.spyOn(httpClient, "get").mockImplementationOnce(async () =>
+      response({
+        images: ["/images/detalle-1.jpg"],
+        imageUrl: "/images/legacy.jpg",
+        slug: "auriculares",
+        subcategory: "Audio",
+        featured: true,
+        originalPrice: 59999,
+        fulfillment: "24/48 hs",
+        description: ["Una línea", "Otra línea"],
+        highlights: ["Bluetooth"],
+        specs: [{ label: "Color", value: "Negro" }],
+        published: false,
+      }) as never,
+    );
+
+    const detail = await getAdminProductDetail("42");
+
+    expect(get).toHaveBeenCalledWith("/api/products/42", {
+      headers: { Authorization: "Bearer admin-token" },
+    });
+    expect(detail).toMatchObject({
+      images: ["/images/detalle-1.jpg"],
+      slug: "auriculares",
+      subcategory: "Audio",
+      featured: true,
+      originalPrice: 59999,
+      fulfillment: "24/48 hs",
+      description: ["Una línea", "Otra línea"],
+      highlights: ["Bluetooth"],
+      specs: [{ label: "Color", value: "Negro" }],
+      published: false,
+    });
+  });
+
+  it("uploads a real image file with the bearer token", async () => {
+    const post = vi.spyOn(httpClient, "post").mockImplementationOnce(async () =>
+      response({
+        key: "productos/foto.png",
+        url: "/api/products/images/productos/foto.png",
+      }) as never,
+    );
+    const body = new FormData();
+    body.append(
+      "file",
+      new File(["bytes"], "foto.png", { type: "image/png" }),
+      "foto.png",
+    );
+
+    await expect(uploadAdminProductImage(body)).resolves.toEqual({
+      key: "productos/foto.png",
+      url: "/api/products/images/productos/foto.png",
+    });
+    expect(post).toHaveBeenCalledWith(
+      "/api/products/admin/images",
+      expect.any(FormData),
+      { headers: { Authorization: "Bearer admin-token" } },
+    );
   });
 
   it("does not call the API or revalidate for an empty batch", async () => {

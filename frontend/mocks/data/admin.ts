@@ -92,27 +92,27 @@ export const adminSummary: AdminSummary = {
     {
       id: "activity-order-1042",
       text: "Nuevo pedido #1042 — Lucía Fernández",
-      time: "Hace 12 min",
+      when: "Hace 12 min",
     },
     {
       id: "activity-payment-1041",
       text: "Pago acreditado #1041 — $ 129.999",
-      time: "Hace 27 min",
+      when: "Hace 27 min",
     },
     {
       id: "activity-stock-rem-bas-bla",
       text: "Stock actualizado — REM-BAS-BLA (3 u.)",
-      time: "Hace 1 h",
+      when: "Hace 1 h",
     },
     {
       id: "activity-cancel-1038",
       text: "Pedido cancelado #1038 — Ana Torres",
-      time: "Hace 2 h",
+      when: "Hace 2 h",
     },
     {
       id: "activity-product-gorra",
       text: "Producto publicado — Gorra clásica negra",
-      time: "Hace 4 h",
+      when: "Hace 4 h",
     },
   ],
 };

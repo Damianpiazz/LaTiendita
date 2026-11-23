@@ -25,6 +25,12 @@ export type AdminProduct = {
 /** Status pill selection; `all` sends no `status` query param. */
 export type AdminProductStatusFilter = "all" | AdminProductStatus;
 
+/** Label/value pair persisted in `ProductDto.specs`. */
+export type AdminProductSpec = {
+  label: string;
+  value: string;
+};
+
 /** Payload of the product form; the backend DTO is built at the action boundary. */
 export type AdminProductPayload = {
   productId?: string;
@@ -34,6 +40,15 @@ export type AdminProductPayload = {
   price: number;
   quantity: number;
   description?: string;
+  /** Stable catalog slug; the backend derives one when omitted. */
+  slug?: string;
+  subcategory?: string;
+  featured?: boolean;
+  /** Price before discount; `null` when the product has no discount. */
+  originalPrice?: number | null;
+  fulfillment?: string;
+  highlights?: string[];
+  specs?: AdminProductSpec[];
   /** Up to ten gallery references; the first one is the main image. */
   images: string[];
   published: boolean;

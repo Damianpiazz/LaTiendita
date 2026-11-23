@@ -78,6 +78,20 @@ class ReviewApiIntegrationTest {
     }
 
     @Test
+    void shouldExposeOnlyTheAuthenticatedCustomersReviews() throws Exception {
+        String id = createReview();
+
+        mockMvc.perform(get("/api/reviews/me").header("X-User-Id", CUSTOMER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id))
+                .andExpect(jsonPath("$[0].status").value("pending"));
+
+        mockMvc.perform(get("/api/reviews/me").header("X-User-Id", "another-customer"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void shouldCreateReviewAndExposeItOnlyAfterApproval() throws Exception {
         String id = createReview();
 

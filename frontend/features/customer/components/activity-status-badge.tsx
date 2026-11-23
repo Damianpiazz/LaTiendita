@@ -2,24 +2,38 @@ import type { CustomerActivityStatus } from "@/features/customer/types";
 import { cn } from "@/lib/utils";
 
 /**
- * 24px pill of the activity rows.
- *
- * `Publicada` reuses the subtle fill of `Enviado` and `Actualizado` is the only
- * outlined state, exactly as the frame draws them; the activity vocabulary does
- * not overlap the order one, so it gets its own badge.
+ * 24px pill of the activity rows. `Publicada` reuses the subtle fill of
+ * `Enviado` and the remaining states stay outlined, exactly as the frame draws
+ * them; order states share the same neutral vocabulary here.
  */
 const statusStyles: Record<CustomerActivityStatus, { label: string; className: string }> = {
-  entregado: {
-    label: "Entregado",
-    className: "bg-wf-inverse text-wf-on-inverse",
+  pendiente: {
+    label: "Pendiente",
+    className: "bg-wf-subtle text-wf-ink-secondary",
+  },
+  pagado: {
+    label: "Pagado",
+    className: "border border-wf-line-strong text-wf-ink-secondary",
   },
   enviado: {
     label: "Enviado",
     className: "bg-wf-subtle text-wf-ink-secondary",
   },
+  entregado: {
+    label: "Entregado",
+    className: "bg-wf-inverse text-wf-on-inverse",
+  },
+  cancelado: {
+    label: "Cancelado",
+    className: "border border-wf-line-strong text-wf-ink-muted",
+  },
   publicada: {
     label: "Publicada",
     className: "bg-wf-subtle text-wf-ink-secondary",
+  },
+  rechazada: {
+    label: "Rechazada",
+    className: "border border-wf-line-strong text-wf-ink-muted",
   },
   actualizado: {
     label: "Actualizado",

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -31,6 +31,23 @@ const customerDto = {
   createdAt: "2025-04-02T10:00:00Z",
 };
 
+const orderDto = {
+  id: 1042,
+  orderNumber: "#1042",
+  status: "DELIVERED",
+  total: "42900.00",
+  createdAt: "2026-03-12T10:00:00Z",
+};
+
+const reviewDto = {
+  productId: 7,
+  title: "Auriculares inalámbricos",
+  status: "approved",
+  createdAt: "2026-03-05T10:00:00Z",
+};
+
+const authHeaders = { Authorization: "Bearer jwt-real" };
+
 function setCookies(token?: string, user?: Parameters<typeof encodeUserCookie>[0]) {
   mocks.cookieGet.mockImplementation((name: string) => {
     if (name === "lt_access_token" && token) {
@@ -43,9 +60,30 @@ function setCookies(token?: string, user?: Parameters<typeof encodeUserCookie>[0
   });
 }
 
+/** All three profile reads by URL, so one `vi.fn()` can serve them. */
+function mockProfileApi(customer: typeof customerDto = customerDto) {
+  mocks.get.mockImplementation((url: string) => {
+    if (url === "/api/customers/me") {
+      return Promise.resolve({ data: customer });
+    }
+    if (url === "/api/orders") {
+      return Promise.resolve({ data: { content: [orderDto], totalElements: 1 } });
+    }
+    if (url === "/api/reviews/me") {
+      return Promise.resolve({ data: [reviewDto] });
+    }
+    return Promise.reject(new Error(`Unexpected GET ${url}`));
+  });
+}
+
 describe("getCustomerProfile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("redirects to login when there is no session", async () => {
@@ -57,16 +95,40 @@ describe("getCustomerProfile", () => {
     expect(mocks.get).not.toHaveBeenCalled();
   });
 
-  it("reads the authenticated customer with the session JWT", async () => {
+  it("reads identity, own orders and own reviews with the session JWT", async () => {
     setCookies("jwt-real");
-    mocks.get.mockResolvedValue({ data: customerDto });
+    mockProfileApi();
 
     const profile = await getCustomerProfile();
 
-    expect(mocks.get).toHaveBeenCalledWith("/api/customers/me", {
-      headers: { Authorization: "Bearer jwt-real" },
+    expect(mocks.get).toHaveBeenCalledWith("/api/customers/me", { headers: authHeaders });
+    expect(mocks.get).toHaveBeenCalledWith("/api/orders", {
+      params: { page: 0, size: 100, sort: "createdAt,desc" },
+      headers: authHeaders,
     });
-    expect(profile).toMatchObject({ email: "ana@example.com", initials: "AP" });
+    expect(mocks.get).toHaveBeenCalledWith("/api/reviews/me", { headers: authHeaders });
+    expect(profile).toMatchObject({
+      email: "ana@example.com",
+      initials: "AP",
+      stats: { orders: 1, totalSpent: 42900, lastPurchase: "12 mar 2026", reviews: 1 },
+    });
+    expect(profile.orders).toHaveLength(1);
+    expect(profile.activity[0].description).toContain("Pedido #1042");
+  });
+
+  it("keeps the profile when the optional order and review services fail", async () => {
+    setCookies("jwt-real");
+    mocks.get.mockImplementation((url: string) =>
+      url === "/api/customers/me"
+        ? Promise.resolve({ data: customerDto })
+        : Promise.reject(new Error("servicio caído")),
+    );
+
+    const profile = await getCustomerProfile();
+
+    expect(profile.email).toBe("ana@example.com");
+    expect(profile.stats).toEqual({ orders: 0, totalSpent: 0, lastPurchase: "—", reviews: 0 });
+    expect(profile.activity).toEqual([]);
   });
 
   it("provisions the customer once when the backend has no record yet", async () => {
@@ -85,7 +147,19 @@ describe("getCustomerProfile", () => {
       firstName: "Bruno",
       lastName: "Díaz",
     };
-    mocks.get.mockRejectedValueOnce({ response: { status: 404 } });
+    let customerCalls = 0;
+    mocks.get.mockImplementation((url: string) => {
+      if (url === "/api/customers/me") {
+        customerCalls += 1;
+        return customerCalls === 1
+          ? Promise.reject({ response: { status: 404 } })
+          : Promise.resolve({ data: newCustomerDto });
+      }
+      if (url === "/api/orders") {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } });
+      }
+      return Promise.resolve({ data: [] });
+    });
     mocks.post.mockResolvedValue({ data: newCustomerDto });
 
     const profile = await getCustomerProfile();
@@ -98,7 +172,7 @@ describe("getCustomerProfile", () => {
         lastName: "Díaz",
         phone: "",
       },
-      { headers: { Authorization: "Bearer jwt-real" } },
+      { headers: authHeaders },
     );
     expect(profile.email).toBe("bruno@example.com");
     expect(profile.initials).toBe("BD");
@@ -113,13 +187,24 @@ describe("getCustomerProfile", () => {
       roles: ["cliente"],
     };
     setCookies("jwt-real", user);
-    mocks.get.mockRejectedValueOnce({ response: { status: 404 } });
+    let customerCalls = 0;
+    mocks.get.mockImplementation((url: string) => {
+      if (url === "/api/customers/me") {
+        customerCalls += 1;
+        return customerCalls === 1
+          ? Promise.reject({ response: { status: 404 } })
+          : Promise.resolve({ data: customerDto });
+      }
+      if (url === "/api/orders") {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } });
+      }
+      return Promise.resolve({ data: [] });
+    });
     mocks.post.mockRejectedValueOnce({ response: { status: 409 } });
-    mocks.get.mockResolvedValueOnce({ data: customerDto });
 
     const profile = await getCustomerProfile();
 
-    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(customerCalls).toBe(2);
     expect(profile.email).toBe("ana@example.com");
   });
 });

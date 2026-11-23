@@ -31,7 +31,7 @@ describe("SiteHeader session states", () => {
   it("shows the account chip and logs out when signed in", async () => {
     render(<SiteHeader account={{ initials: "AP", label: "Ana" }} />);
 
-    expect(screen.getByRole("link", { name: /Ana/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Ana/ })).toHaveAttribute("href", "/mi-cuenta");
 
     fireEvent.click(screen.getByRole("button", { name: "Salir" }));
 

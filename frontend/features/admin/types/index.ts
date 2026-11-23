@@ -40,6 +40,7 @@ export type {
 export type {
   AdminProduct,
   AdminProductPayload,
+  AdminProductSpec,
   AdminProducts,
   AdminProductStatus,
   AdminProductStatusFilter,

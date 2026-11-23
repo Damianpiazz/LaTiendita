@@ -4,11 +4,12 @@ import type { AdminSummary } from "@/features/admin/types";
 
 /**
  * Page header of the summary screen: title and subtitle on the left, period
- * control and `+ Nuevo producto` on the right.
+ * control and the link to products on the right.
  *
- * The period control is presentational — the frame draws no menu for it, same
- * as the sort control of the catalog screens. The creation form is out of
- * scope, so the action points at the products screen.
+ * The summary endpoint only serves a fixed 7-day window, so the period control
+ * is an explicitly disabled select instead of a dropdown that does nothing.
+ * The creation form lives on the products screen, so the action is labelled as
+ * plain navigation instead of promising to open it here.
  */
 export function AdminSummaryHeader({ summary }: { summary: AdminSummary }) {
   return (
@@ -21,19 +22,26 @@ export function AdminSummaryHeader({ summary }: { summary: AdminSummary }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
-          <span className="text-wf-ink-muted">Período:</span>
-          <span className="font-medium text-wf-ink">Últimos 7 días</span>
-          <span aria-hidden className="text-wf-ink-placeholder">
-            ↓
-          </span>
-        </span>
+        <div className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
+          <label htmlFor="admin-summary-range" className="text-wf-ink-muted">
+            Período:
+          </label>
+          <select
+            id="admin-summary-range"
+            aria-label="Período del resumen"
+            disabled
+            title="El resumen solo está disponible para los últimos 7 días"
+            className="cursor-not-allowed bg-transparent font-medium text-wf-ink disabled:text-wf-ink-muted"
+          >
+            <option value="7">Últimos 7 días</option>
+          </select>
+        </div>
 
         <Link
           href="/admin/productos"
           className="flex h-10 items-center rounded-wf-sm bg-wf-inverse px-4 text-sm font-medium text-wf-on-inverse transition-colors hover:bg-wf-ink"
         >
-          + Nuevo producto
+          Ir a productos
         </Link>
       </div>
     </header>

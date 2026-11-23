@@ -1,9 +1,32 @@
+"use client";
+
+import { useState, useTransition } from "react";
+
 import { RatingStars } from "@/features/product/components/rating-stars";
+import { markReviewHelpful } from "@/features/review/actions/review.actions";
 import { formatReviewDate } from "@/features/review/helpers/format-review-date";
 import type { Review } from "@/features/review/types";
 
-/** One approved review card. */
+/** One approved review card, with a real "helpful" vote. */
 export function ReviewCard({ review }: { review: Review }) {
+  const [helpfulCount, setHelpfulCount] = useState(review.helpfulCount);
+  const [voted, setVoted] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function voteHelpful() {
+    startTransition(async () => {
+      const result = await markReviewHelpful(review.id);
+
+      if (result.ok) {
+        setHelpfulCount((count) => count + 1);
+        setVoted(true);
+      } else {
+        setMessage(result.message ?? "No pudimos registrar tu voto.");
+      }
+    });
+  }
+
   return (
     <article className="flex flex-col gap-2.5 rounded-wf-card border border-wf-line bg-wf-surface p-5">
       <div className="flex items-center gap-2.5">
@@ -25,13 +48,30 @@ export function ReviewCard({ review }: { review: Review }) {
 
       <div className="flex flex-wrap items-center gap-4 text-xs">
         <span className="text-wf-ink-muted">¿Te sirvió?</span>
-        <span className="font-medium text-wf-ink-secondary">
-          Sí ({review.helpfulCount})
-        </span>
-        <span className="font-medium text-wf-ink-secondary">
+        <button
+          type="button"
+          onClick={voteHelpful}
+          disabled={pending || voted}
+          title={voted ? "Ya registraste tu voto" : undefined}
+          className="font-medium text-wf-ink-secondary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-wf-ink-muted disabled:no-underline"
+        >
+          Sí ({helpfulCount})
+        </button>
+        <button
+          type="button"
+          disabled
+          title="El voto negativo todavía no está disponible"
+          className="font-medium text-wf-ink-placeholder"
+        >
           No ({review.notHelpfulCount})
-        </span>
+        </button>
       </div>
+
+      {message ? (
+        <p role="alert" className="text-xs text-red-600">
+          {message}
+        </p>
+      ) : null}
     </article>
   );
 }

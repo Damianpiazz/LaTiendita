@@ -6,11 +6,11 @@
  * of a collection.
  */
 
-/** State printed in the activity rows. */
+/** State printed in the activity rows. Orders reuse the purchase vocabulary. */
 export type CustomerActivityStatus =
-  | "entregado"
-  | "enviado"
+  | CustomerOrderStatus
   | "publicada"
+  | "rechazada"
   | "actualizado";
 
 /** One row of `Actividad reciente`. */
@@ -19,15 +19,24 @@ export type CustomerActivity = {
   date: string;
   description: string;
   status: CustomerActivityStatus;
+  /** Optional destination when the movement points to a detail screen. */
+  href?: string;
 };
 
-/** State printed in the purchases table; the frame only draws two. */
-export type CustomerOrderStatus = "entregado" | "enviado";
+/** UI states of the purchases table, mapped from the backend `OrderStatus`. */
+export type CustomerOrderStatus =
+  | "pendiente"
+  | "pagado"
+  | "enviado"
+  | "entregado"
+  | "cancelado";
 
 /** One row of `Mis compras`. */
 export type CustomerOrder = {
   /** Display id including the hash, e.g. `#1042`. */
   id: string;
+  /** Numeric id used by `/api/orders/{id}` for the detail route. */
+  orderId?: string;
   date: string;
   status: CustomerOrderStatus;
   total: number;
@@ -61,6 +70,8 @@ export type CustomerPreferences = {
 export type CustomerProfile = {
   /** Given name used by the greeting, e.g. `Lucía`. */
   firstName: string;
+  /** Surname returned by customer-service; optional for legacy fixtures. */
+  lastName?: string;
   name: string;
   /** Initials drawn in the header chip and the 64px avatar, e.g. `LF`. */
   initials: string;

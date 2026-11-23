@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { OrderStatusBadge } from "@/features/customer/components/order-status-badge";
 import type { CustomerOrder } from "@/features/customer/types";
 import { formatPrice } from "@/features/product/helpers/format-price";
@@ -14,9 +16,12 @@ export function ProfilePurchases({ orders }: { orders: CustomerOrder[] }) {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl leading-[29px] font-bold text-wf-ink">Mis compras</h2>
-        <span className="shrink-0 text-sm leading-[17px] text-wf-ink-secondary">
+        <Link
+          href="/mi-cuenta/pedidos"
+          className="shrink-0 text-sm leading-[17px] text-wf-ink-secondary underline-offset-2 hover:text-wf-ink hover:underline"
+        >
           Ver todos los pedidos →
-        </span>
+        </Link>
       </div>
 
       <div className="overflow-hidden rounded-wf-md border border-wf-line bg-wf-surface">
@@ -30,6 +35,11 @@ export function ProfilePurchases({ orders }: { orders: CustomerOrder[] }) {
               <span className="flex-1 text-right">Acción</span>
             </div>
 
+            {orders.length === 0 ? (
+              <div className="flex h-16 items-center justify-center text-sm text-wf-ink-muted">
+                Todavía no realizaste compras.
+              </div>
+            ) : null}
             {orders.map((order, index) => (
               <div
                 key={order.id}
@@ -47,7 +57,12 @@ export function ProfilePurchases({ orders }: { orders: CustomerOrder[] }) {
                   {formatPrice(order.total)}
                 </span>
                 <span className="flex-1 text-right text-wf-ink-secondary">
-                  Ver detalle →
+                  <Link
+                    href={`/mi-cuenta/pedidos/${encodeURIComponent(order.orderId ?? order.id.replace("#", ""))}`}
+                    className="underline-offset-2 hover:text-wf-ink hover:underline"
+                  >
+                    Ver detalle →
+                  </Link>
                 </span>
               </div>
             ))}

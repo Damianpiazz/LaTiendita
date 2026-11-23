@@ -17,7 +17,7 @@ describe("T3 baseline parity for pre-existing commands", () => {
       if (url === "/api/categories") return res({ content: [{ categoryId: 7, name: "Hogar", slug: "hogar", productCount: 3 }], totalElements: 6 }) as never;
       throw new Error(url);
     });
-    const products = await getAdminProducts({ page: 3, size: 5, q: "x", status: "ACTIVE", categoryId: "7", sort: "name,asc" });
+    const products = await getAdminProducts({ page: 3, size: 5, q: "x", status: "publicado", categoryId: "7", sort: "name,asc" });
     const categories = await getAdminCategories({ page: 3, q: "x", featured: false, size: 5, sort: "name,asc" });
     console.log("T3_PARITY_CALLS=" + JSON.stringify(get.mock.calls));
     console.log("T3_PARITY_RESULT=" + JSON.stringify({ products, categories }));

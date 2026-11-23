@@ -8,6 +8,8 @@ type AddressFormProps = {
   action: (formData: FormData) => void;
   state: SaveShippingAddressState;
   address?: ShippingAddress;
+  /** Internal path to open after saving; defaults to the checkout step. */
+  next?: string;
 };
 
 type TextFieldProps = {
@@ -29,10 +31,11 @@ type TextFieldProps = {
  * Wireframe: 16px between blocks, label 14/500 `text/secondary` 8px above a
  * 40px input with a `border/strong` hairline.
  */
-export function AddressForm({ formId, action, state, address }: AddressFormProps) {
+export function AddressForm({ formId, action, state, address, next }: AddressFormProps) {
   return (
     <form id={formId} action={action} className="flex flex-col gap-4" noValidate>
       <input type="hidden" name="addressId" value={address?.id ?? ""} />
+      <input type="hidden" name="next" value={next ?? ""} />
       <fieldset className="flex flex-col gap-4 border-0 p-0">
         <legend className="sr-only">Dirección de entrega</legend>
 

@@ -1,7 +1,6 @@
 package com.latiendita.reviewService.review;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -17,6 +16,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "product_ratings")
@@ -37,7 +38,7 @@ public class ProductRatingEntity {
     @Column(name = "review_count", nullable = false)
     private int reviewCount;
 
-    @Convert(converter = JsonDistributionConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private Map<String, Integer> distribution;
 

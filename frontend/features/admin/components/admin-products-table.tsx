@@ -33,6 +33,7 @@ const DEFAULT_SORT = "id,desc";
 
 type FormState = { open: false } | { open: true; product?: AdminProduct };
 type ConfirmState = { kind: "archive" | "delete"; ids: string[] } | null;
+export type AdminProductRowAction = "publish" | "archive" | "delete";
 
 type AdminProductsWorkspaceProps = {
   initialProducts: AdminProducts;
@@ -198,6 +199,17 @@ export function AdminProductsWorkspace({
     }
   }
 
+  function handleRowAction(action: AdminProductRowAction, product: AdminProduct) {
+    const id = rowId(product);
+    if (action === "publish") {
+      void mutate(() => publishAdminProducts([id], true));
+    } else if (action === "archive") {
+      void mutate(() => publishAdminProducts([id], false));
+    } else {
+      setConfirmState({ kind: "delete", ids: [id] });
+    }
+  }
+
   const pageSize = products.pageSize || PAGE_SIZE;
   const pageCount = Math.max(1, Math.ceil(products.totalProducts / pageSize));
   const first = products.items.length ? (page - 1) * pageSize + 1 : 0;
@@ -245,6 +257,7 @@ export function AdminProductsWorkspace({
         selectedIds={selectedIds}
         onToggleSelect={toggleSelection}
         onEdit={(product) => setFormState({ open: true, product })}
+        onAction={handleRowAction}
       />
       <AdminPagination
         label={`Mostrando ${first}–${last} de ${products.totalProducts} productos`}
@@ -279,6 +292,7 @@ type AdminProductsTableProps = {
   selectedIds?: Set<string>;
   onToggleSelect?: (product: AdminProduct) => void;
   onEdit?: (product: AdminProduct) => void;
+  onAction?: (action: AdminProductRowAction, product: AdminProduct) => void;
 };
 
 /** Products table: the frame's column widths and row height, now interactive. */
@@ -287,6 +301,7 @@ export function AdminProductsTable({
   selectedIds,
   onToggleSelect,
   onEdit,
+  onAction,
 }: AdminProductsTableProps) {
   const lowStockThreshold = products.lowStockThreshold;
 
@@ -390,12 +405,40 @@ export function AdminProductsTable({
                   >
                     Editar
                   </button>
-                  <span
-                    aria-hidden
-                    className="font-bold text-wf-ink-placeholder"
-                  >
-                    ···
-                  </span>
+                  <details className="relative list-none [&::-webkit-details-marker]:hidden">
+                    <summary
+                      aria-label={`Acciones de ${product.name}`}
+                      className="cursor-pointer font-bold text-wf-ink-placeholder hover:text-wf-ink"
+                    >
+                      ···
+                    </summary>
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-7 z-20 flex w-36 flex-col rounded-wf-sm border border-wf-line bg-wf-surface p-1 shadow-lg"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          onAction?.(
+                            product.status === "publicado" ? "archive" : "publish",
+                            product,
+                          );
+                        }}
+                        className="rounded-wf-sm px-3 py-2 text-left text-sm text-wf-ink-secondary hover:bg-wf-canvas hover:text-wf-ink"
+                      >
+                        {product.status === "publicado" ? "Archivar" : "Publicar"}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => onAction?.("delete", product)}
+                        className="rounded-wf-sm px-3 py-2 text-left text-sm text-red-600 hover:bg-wf-canvas"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </details>
                 </div>
               </div>
             );

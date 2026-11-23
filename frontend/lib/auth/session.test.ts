@@ -7,6 +7,9 @@ import {
   encodeUserCookie,
   parseAuthorizerAuth,
   sessionCookieOptions,
+  sessionFullName,
+  sessionInitials,
+  sessionRoleLabel,
 } from "./session";
 
 const authorizerPayload = {
@@ -55,5 +58,33 @@ describe("Authorizer session mapping", () => {
     const user = parseAuthorizerAuth(authorizerPayload).user;
     expect(decodeUserCookie(encodeUserCookie(user))).toEqual(user);
     expect(decodeUserCookie(undefined)).toBeNull();
+  });
+});
+
+describe("session display helpers", () => {
+  const user = {
+    id: "user-1",
+    email: "elena.admin@latiendita.test",
+    givenName: "Elena",
+    familyName: "Administradora",
+    roles: ["cliente", "admin"],
+  };
+
+  it("derives initials and a full name from the session", () => {
+    expect(sessionInitials(user)).toBe("EA");
+    expect(sessionFullName(user)).toBe("Elena Administradora");
+  });
+
+  it("falls back to the email when the name is missing", () => {
+    const anonymous = { ...user, givenName: undefined, familyName: undefined };
+
+    expect(sessionInitials(anonymous)).toBe("EL");
+    expect(sessionFullName(anonymous)).toBe("elena.admin");
+  });
+
+  it("labels the admin role even when the client role is also present", () => {
+    expect(sessionRoleLabel(user)).toBe("Administrador");
+    expect(sessionRoleLabel({ ...user, roles: ["cliente"] })).toBe("Cliente");
+    expect(sessionRoleLabel({ ...user, roles: [] })).toBe("Usuario");
   });
 });

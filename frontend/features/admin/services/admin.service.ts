@@ -28,6 +28,10 @@ import {
   ADMIN_CLIENTS_DEFAULT_SORT,
   ADMIN_CLIENTS_PAGE_SIZE,
 } from "@/features/admin/helpers/admin-clients.constants";
+import {
+  ADMIN_RANGE_DEFAULT_DAYS,
+  adminRangeLabel,
+} from "@/features/admin/helpers/admin-range";
 import type {
   AdminCategories,
   AdminCategoriesQuery,
@@ -38,7 +42,6 @@ import type {
   AdminClientsQuery,
   AdminClientStatus,
   AdminPaymentStatus,
-  AdminPaymentStatusFilter,
   AdminProductsQuery,
   AdminNavigationCounts,
   AdminOrders,
@@ -48,8 +51,14 @@ import type {
   AdminProducts,
   AdminSummary,
 } from "@/features/admin/types";
-import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/session";
+import {
+  ACCESS_TOKEN_COOKIE,
+  decodeUserCookie,
+  USER_COOKIE,
+  type SessionUser,
+} from "@/lib/auth/session";
 import { httpClient } from "@/lib/http/client";
+import { mockAuth } from "@/mocks/data/auth";
 
 export {
   ADMIN_CLIENTS_DEFAULT_SORT,
@@ -86,6 +95,25 @@ async function adminAuthHeaders(): Promise<Record<string, string>> {
   const jar = await cookies();
   const token = jar.get(ACCESS_TOKEN_COOKIE)?.value;
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** The orders endpoint takes an absolute `from`/`to` Instant window. */
+function orderRangeParams(days: number): Record<string, string> {
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+/** Identity shown by the admin shell, read from the real session or mock login. */
+export async function getAdminSessionUser(): Promise<SessionUser | null> {
+  if (env.useMocks) {
+    return mockAuth.session().user;
+  }
+
+  const jar = await cookies();
+  const token = jar.get(ACCESS_TOKEN_COOKIE)?.value;
+
+  return token ? decodeUserCookie(jar.get(USER_COOKIE)?.value) : null;
 }
 
 /** Dashboard of the admin summary screen. */
@@ -283,6 +311,43 @@ async function resolveOrderPaymentMethods(
   return map;
 }
 
+type CustomerIdentity = { email?: string | null; name?: string | null };
+type CustomerDetailLookup = {
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+/**
+ * Orders and payments only carry `customerId`, so the admin BFF resolves the
+ * identity with the admin-authorized customer endpoint. A failed lookup keeps
+ * the id that was already displayed; it never breaks the whole table.
+ */
+async function resolveCustomerIdentities(
+  customerIds: string[],
+  headers: Record<string, string>,
+): Promise<Map<string, CustomerIdentity>> {
+  const uniqueIds = [...new Set(customerIds.filter(Boolean))];
+  const entries = await Promise.allSettled(
+    uniqueIds.map(async (customerId) => {
+      const { data } = await httpClient.get<CustomerDetailLookup>(
+        `/api/customers/${encodeURIComponent(customerId)}`,
+        { headers },
+      );
+      const name = `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim();
+      return [customerId, { email: data.email ?? null, name: name || null }] as const;
+    }),
+  );
+
+  const map = new Map<string, CustomerIdentity>();
+  for (const entry of entries) {
+    if (entry.status === "fulfilled") {
+      map.set(entry.value[0], entry.value[1]);
+    }
+  }
+  return map;
+}
+
 /** Orders table: visible page, store totals and the status tab counts. */
 export async function getAdminOrders(
   query: AdminOrdersQuery = {},
@@ -290,10 +355,12 @@ export async function getAdminOrders(
   const headers = await adminAuthHeaders();
   const size = query.size ?? ADMIN_ORDERS_PAGE_SIZE;
   const uiPage = query.page ?? 1;
+  const days = query.days ?? ADMIN_RANGE_DEFAULT_DAYS;
   const params: Record<string, string | number> = {
     page: Math.max(0, uiPage - 1),
     size,
     sort: query.sort ?? ADMIN_ORDERS_DEFAULT_SORT,
+    ...orderRangeParams(days),
   };
   if (query.q) params.q = query.q;
   if (query.status && query.status !== "all") {
@@ -316,16 +383,27 @@ export async function getAdminOrders(
   ]);
 
   const rawItems = Array.isArray(list.data) ? list.data : (list.data.content ?? []);
-  const paymentMethods = await resolveOrderPaymentMethods(
-    rawItems.map((item) => item.id),
-    headers,
-  );
-  const items = rawItems.map((item) => ({
-    ...item,
-    paymentMethod: item.paymentMethod ?? paymentMethods.get(item.id) ?? null,
-  }));
+  const [paymentMethods, customers] = await Promise.all([
+    resolveOrderPaymentMethods(
+      rawItems.map((item) => item.id),
+      headers,
+    ),
+    resolveCustomerIdentities(
+      rawItems.map((item) => String(item.customerId ?? "")),
+      headers,
+    ),
+  ]);
+  const items = rawItems.map((item) => {
+    const identity = customers.get(String(item.customerId ?? ""));
+    return {
+      ...item,
+      paymentMethod: item.paymentMethod ?? paymentMethods.get(item.id) ?? null,
+      ...(identity?.email ? { customerEmail: identity.email } : {}),
+      ...(identity?.name ? { customerName: identity.name } : {}),
+    };
+  });
 
-  return mapAdminOrders({ items, stats: stats.data, pageSize: size });
+  return mapAdminOrders({ items, stats: stats.data, pageSize: size, rangeDays: days });
 }
 
 /**
@@ -340,11 +418,12 @@ export async function getAdminPayments(
   const headers = await adminAuthHeaders();
   const size = query.size ?? ADMIN_PAYMENTS_PAGE_SIZE;
   const uiPage = query.page ?? 1;
+  const days = query.days ?? ADMIN_PAYMENTS_RANGE_DAYS;
   const params: Record<string, string | number> = {
     page: Math.max(0, uiPage - 1),
     size,
     sort: query.sort ?? ADMIN_PAYMENTS_DEFAULT_SORT,
-    days: ADMIN_PAYMENTS_RANGE_DAYS,
+    days,
   };
   if (query.q) {
     params.q = query.q;
@@ -359,15 +438,30 @@ export async function getAdminPayments(
       headers,
     }),
     httpClient.get<AdminPaymentsSummaryApi>("/api/payments/admin/summary", {
-      params: { days: ADMIN_PAYMENTS_RANGE_DAYS },
+      params: { days },
       headers,
     }),
   ]);
 
+  const rawItems = unwrapPage(list.data);
+  const customers = await resolveCustomerIdentities(
+    rawItems.map((item) => String(item.customerId ?? "")),
+    headers,
+  );
+  const items = rawItems.map((item) => {
+    const identity = customers.get(String(item.customerId ?? ""));
+    return {
+      ...item,
+      ...(identity?.email ? { email: identity.email } : {}),
+      ...(identity?.name ? { customerName: identity.name } : {}),
+    };
+  });
+
   return {
-    items: unwrapPage(list.data).map(mapAdminPayment),
+    items: items.map(mapAdminPayment),
     pageSize: size,
     ...mapAdminPaymentSummary(summary.data),
+    rangeLabel: adminRangeLabel(days),
   };
 }
 
@@ -555,6 +649,7 @@ export async function getAdminClientDetail(
   const firstName = data.firstName ?? row?.firstName ?? "";
   const lastName = data.lastName ?? row?.lastName ?? "";
   const name = `${firstName} ${lastName}`.trim();
+  const status = row?.status ?? statusFromBackend(data.status);
   const base: AdminClient = row ?? {
     customerId: id,
     firstName,
@@ -568,7 +663,7 @@ export async function getAdminClientDetail(
     lastPurchase: formatLastPurchase(null),
     ...(data.createdAt ? { createdAt: data.createdAt } : {}),
     ...(data.lastLoginAt ? { lastLoginAt: data.lastLoginAt } : {}),
-    status: statusFromBackend(data.status),
+    status,
   };
   const initials = initialsFor(firstName, lastName, data.email ?? base.email);
 
@@ -585,7 +680,7 @@ export async function getAdminClientDetail(
     ...(data.lastLoginAt !== undefined
       ? { lastLoginAt: data.lastLoginAt }
       : {}),
-    status: statusFromBackend(data.status),
+    status,
     ...(data.newsletterOptIn !== undefined
       ? { newsletterOptIn: data.newsletterOptIn }
       : {}),

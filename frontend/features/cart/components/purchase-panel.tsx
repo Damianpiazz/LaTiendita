@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useCartStore } from "@/features/cart/store/cart-store";
@@ -15,8 +16,14 @@ type PurchasePanelProps = {
  * rhythm measured in the wireframe.
  */
 export function PurchasePanel({ productId }: PurchasePanelProps) {
+  const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
   const [quantity, setQuantity] = useState(1);
+
+  function handleBuyNow() {
+    addItem(productId, quantity);
+    router.push("/checkout/envio");
+  }
 
   return (
     <>
@@ -60,6 +67,7 @@ export function PurchasePanel({ productId }: PurchasePanelProps) {
 
       <button
         type="button"
+        onClick={handleBuyNow}
         className="h-12 w-full rounded-wf-sm border border-wf-line-strong bg-wf-surface text-[15px] font-medium text-wf-ink-secondary transition-colors hover:bg-wf-canvas"
       >
         Comprar ahora

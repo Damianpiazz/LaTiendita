@@ -27,6 +27,7 @@ vi.mock("@/features/review/services/review.service", () => ({
 
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 import { ProductDetailPage } from "./product-detail-page";

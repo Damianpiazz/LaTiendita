@@ -1,5 +1,6 @@
 "use client";
 
+import { ADMIN_RANGE_OPTIONS } from "@/features/admin/helpers/admin-range";
 import type { AdminOrderStatus, AdminOrderStatusFilter, AdminOrders } from "@/features/admin/types";
 import { cn } from "@/lib/utils";
 
@@ -15,11 +16,19 @@ const tabs: { status: "todos" | AdminOrderStatus; label: string }[] = [
 type Props = {
   orders: AdminOrders;
   status: AdminOrderStatusFilter;
+  days: number;
   onStatusChange: (status: AdminOrderStatusFilter) => void;
+  onDaysChange: (days: number) => void;
 };
 
-/** Status tabs and the period control above the orders table. */
-export function AdminOrdersFilters({ orders, status, onStatusChange }: Props) {
+/** Status tabs and the date range selector above the orders table. */
+export function AdminOrdersFilters({
+  orders,
+  status,
+  days,
+  onStatusChange,
+  onDaysChange,
+}: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -54,13 +63,24 @@ export function AdminOrdersFilters({ orders, status, onStatusChange }: Props) {
         })}
       </div>
 
-      <span className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
-        <span className="text-wf-ink-muted">Rango:</span>
-        <span className="font-medium text-wf-ink">{orders.rangeLabel}</span>
-        <span aria-hidden className="text-wf-ink-placeholder">
-          ↓
-        </span>
-      </span>
+      <div className="flex h-10 items-center gap-2 rounded-wf-sm border border-wf-line-strong bg-wf-surface px-4 text-sm">
+        <label htmlFor="admin-orders-range" className="text-wf-ink-muted">
+          Rango:
+        </label>
+        <select
+          id="admin-orders-range"
+          aria-label="Rango de pedidos"
+          value={days}
+          onChange={(event) => onDaysChange(Number(event.target.value))}
+          className="bg-transparent font-medium text-wf-ink outline-none"
+        >
+          {ADMIN_RANGE_OPTIONS.map((option) => (
+            <option key={option.days} value={option.days}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

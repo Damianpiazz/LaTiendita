@@ -1,4 +1,4 @@
-import type { AdminPayments } from "@/features/admin/types";
+import type { AdminPayment, AdminPayments } from "@/features/admin/types";
 import { formatPrice } from "@/features/product/helpers/format-price";
 
 import { PaymentStatusBadge } from "./payment-status-badge";
@@ -16,6 +16,7 @@ type AdminPaymentsTableProps = {
   sort: string;
   onSearchChange: (value: string) => void;
   onSortChange: (value: string) => void;
+  onSelect: (payment: AdminPayment) => void;
 };
 
 /**
@@ -29,6 +30,7 @@ export function AdminPaymentsTable({
   sort,
   onSearchChange,
   onSortChange,
+  onSelect,
 }: AdminPaymentsTableProps) {
   return (
     <section className="overflow-hidden rounded-wf-md border border-wf-line bg-wf-surface">
@@ -158,7 +160,14 @@ export function AdminPaymentsTable({
                 role="cell"
                 className="flex flex-1 justify-end font-medium text-wf-ink-secondary"
               >
-                Ver →
+                <button
+                  type="button"
+                  onClick={() => onSelect(payment)}
+                  aria-label={`Ver detalle del pago ${payment.id}`}
+                  className="underline-offset-2 hover:text-wf-ink hover:underline"
+                >
+                  Ver →
+                </button>
               </div>
             </div>
           ))}
