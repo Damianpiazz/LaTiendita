@@ -219,7 +219,7 @@ services:
     build:
       <<: *app-build
       args:
-        MODULE_PATH: cart-service/cartService
+        MODULE_PATH: cart-service
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -232,7 +232,7 @@ services:
     build:
       <<: *app-build
       args:
-        MODULE_PATH: customer-service/customerService
+        MODULE_PATH: customer-service
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -244,7 +244,7 @@ services:
     build:
       <<: *app-build
       args:
-        MODULE_PATH: offer-service/offerService
+        MODULE_PATH: offer-service
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -268,7 +268,7 @@ services:
     build:
       <<: *app-build
       args:
-        MODULE_PATH: review-service/reviewService
+        MODULE_PATH: review-service
     restart: unless-stopped
     environment:
       <<: *app-env
